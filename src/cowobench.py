@@ -19,15 +19,23 @@ limitations under the License.
 @copyright: 2018 by EKDF Consulting and Dmitri Fedorov
 '''
 
+REALM_WIDTH = 100
+REALM_HEIGHT = 100
+REALM_BORDER = 1
+REALMS_MAX_X = 32 
+REALMS_MAX_Y = REALMS_MAX_X
+RGBA = 'RGBA'
+
 from html.parser import HTMLParser
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import imageio
 
 
-def get_frame(data: str, is_impulse_map: bool) -> []:
+def get_table(data: str, is_impulse_map: bool) -> []:
+    """Give the data, yields one table"""
     
     class TurnResultHTMLParser(HTMLParser):
-    
+        """HTML parcer helper"""
         tables = []
         table = []
         row = []
@@ -58,57 +66,54 @@ def get_frame(data: str, is_impulse_map: bool) -> []:
                 if len(value) > 0:
                     self.row.append((value, self.colour))
     
-    #print(data)
     parser = TurnResultHTMLParser()
     parser.feed(data)
-    #if is_impulse_map:
-    #    for table in parser.tables:
-    #        yield table
-    #else:
-    yield parser.tables[-1]
+    if is_impulse_map:
+        for table in parser.tables:
+            yield table
+    else:
+        yield parser.tables[-1]
 
 
-def build_turn_map(turn_result_filename: str) -> Image:
+def html_colour_to_rgba(html_colour: str) -> ():
+    """Convers HTML colout to its RGB values"""
+    html_colour = html_colour.strip()
+    if html_colour[0] == '#':
+        html_colour = html_colour[1:]
+    return tuple([int(x, 16) for x in (html_colour[:2], html_colour[2:4], html_colour[4:], '0')])
 
-    REALM_WIDTH = 100
-    REALM_HEIGHT = 100
-    REALM_BORDER = 1
-    REALMS_MAX_X = 32 
-    REALMS_MAX_Y = REALMS_MAX_X
-    RGBA = 'RGBA'
+
+def get_one_row_image(row: []) -> Image:
+    
     CELL_POINTS_FONT_TYPE = 'arial.ttf'
     CELL_POINTS_FONT_SIZE = 30
     CELL_POINTS_FONT = ImageFont.truetype(CELL_POINTS_FONT_TYPE, CELL_POINTS_FONT_SIZE)
     CELL_POINTS_POSITION = (15, 10)
+
+    row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), (255, 255, 255, 0))
+    for x, cell in enumerate(row):
+
+        cell_image = Image.new(RGBA, (REALM_WIDTH - REALM_BORDER * 2, REALM_HEIGHT - REALM_BORDER * 2), html_colour_to_rgba(cell[1]))
+        draw_context = ImageDraw.Draw(cell_image)
+        realm_points = cell[0].split(' ')[0]
+        draw_context.text(CELL_POINTS_POSITION, realm_points, font=CELL_POINTS_FONT, fill=(0, 0, 0, 255))
+        
+        # if len(cell[0].split(' ')) > 1:
+        #    realm_occupant = ' '.join(cell[0].split(' ')[1:])
+        #    draw_context.text((15, 40), realm_occupant, font=cell_font, fill=(0, 0, 0, 255))
+
+        cell_image = ImageOps.expand(cell_image, REALM_BORDER)
+        
+        row_image.paste(cell_image, (x * REALM_WIDTH, 0))
+    return row_image
+
+
+def build_turn_map(turn_result_filename: str) -> Image:
     
-    def html_colour_to_rgba(html_colour: str) -> ():
-        html_colour = html_colour.strip()
-        if html_colour[0] == '#':
-            html_colour = html_colour[1:]
-        r, g, b = [int(n, 16) for n in (html_colour[:2], html_colour[2:4], html_colour[4:])]
-        return (r, g, b, 0)  
-    
-    for turn_table in get_frame(open(turn_result_filename).read(), False):
+    for turn_table in get_table(open(turn_result_filename).read(), False):
         result = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT * REALMS_MAX_Y), (255, 255, 255, 0))
         for y, row in enumerate(turn_table):
-            
-            row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), (255, 255, 255, 0))
-            for x, cell in enumerate(row):
-
-                cell_image = Image.new(RGBA, (REALM_WIDTH - REALM_BORDER * 2, REALM_HEIGHT - REALM_BORDER * 2), html_colour_to_rgba(cell[1]))
-                draw_context = ImageDraw.Draw(cell_image)
-                realm_points = cell[0].split(' ')[0]
-                draw_context.text(CELL_POINTS_POSITION, realm_points, font=CELL_POINTS_FONT, fill=(0, 0, 0, 255))
-                
-                # if len(cell[0].split(' ')) > 1:
-                #    realm_occupant = ' '.join(cell[0].split(' ')[1:])
-                #    draw_context.text((15, 40), realm_occupant, font=cell_font, fill=(0, 0, 0, 255))
-        
-                cell_image = ImageOps.expand(cell_image, REALM_BORDER)
-                
-                row_image.paste(cell_image, (x * REALM_WIDTH, 0))
-            
-            result.paste(row_image, (0, y * REALM_HEIGHT))
+            result.paste(get_one_row_image(row), (0, y * REALM_HEIGHT))
 
         yield result
     
