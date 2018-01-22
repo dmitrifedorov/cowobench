@@ -18,6 +18,9 @@ limitations under the License.
 @author: Dmitri Fedorov
 @copyright: 2018 by EKDF Consulting and Dmitri Fedorov
 '''
+from plotly.utils import numpy
+
+MAP_CHANGE_RATE_PER_SECOND = 1
 
 REALM_WIDTH = 100
 REALM_HEIGHT = 100
@@ -25,27 +28,28 @@ REALM_BORDER = 1
 REALMS_MAX_X = 32 
 REALMS_MAX_Y = REALMS_MAX_X
 RGBA = 'RGBA'
+EMPTY_IMAGE_RGBA = (255, 255, 255, 0)
 
 from html.parser import HTMLParser
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import imageio
 
 
-def get_table(data: str, is_impulse_map: bool) -> []:
-    """Give the data, yields one table"""
+def get_table(data: str, is_turn_map: bool) -> []:
+    """Give the data, yields one curr_table"""
     
     class TurnResultHTMLParser(HTMLParser):
         """HTML parcer helper"""
         tables = []
-        table = []
-        row = []
+        curr_table = []
+        curr_row = []
         is_table_data = False
         colour = None
         
         def handle_starttag(self, tag: str, attrs: ()):
             if tag == 'table':
                 self.is_table_data = True
-            if tag == 'td':
+            elif tag == 'td':
                 for attr, value in attrs:
                     if attr == 'bgcolor':
                         self.colour = value
@@ -53,26 +57,26 @@ def get_table(data: str, is_impulse_map: bool) -> []:
     
         def handle_endtag(self, tag: str):
             if tag == 'table':
-                self.tables.append(self.table)
-                self.table = []
+                self.tables.append(self.curr_table)
+                self.curr_table = []
                 self.is_table_data = False
-            if tag == 'tr':
-                self.table.append(self.row)
-                self.row = []
+            elif tag == 'tr':
+                self.curr_table.append(self.curr_row)
+                self.curr_row = []
     
         def handle_data(self, data: str):
             if self.is_table_data:
                 value = data.strip()
                 if len(value) > 0:
-                    self.row.append((value, self.colour))
+                    self.curr_row.append((value, self.colour))
     
     parser = TurnResultHTMLParser()
     parser.feed(data)
-    if is_impulse_map:
+    if is_turn_map:
+        yield parser.tables[-1]
+    else:
         for table in parser.tables:
             yield table
-    else:
-        yield parser.tables[-1]
 
 
 def html_colour_to_rgba(html_colour: str) -> ():
@@ -83,39 +87,49 @@ def html_colour_to_rgba(html_colour: str) -> ():
     return tuple([int(x, 16) for x in (html_colour[:2], html_colour[2:4], html_colour[4:], '0')])
 
 
-def get_one_row_image(row: []) -> Image:
-    
+def write_on_cell(cell_image: Image, cell_content: str,
+               is_zero_cell: bool=False, zero_call_label: str=None) -> ImageDraw.Draw:
     CELL_POINTS_FONT_TYPE = 'arial.ttf'
-    CELL_POINTS_FONT_SIZE = 30
+    CELL_POINTS_FONT_SIZE = 35
     CELL_POINTS_FONT = ImageFont.truetype(CELL_POINTS_FONT_TYPE, CELL_POINTS_FONT_SIZE)
-    CELL_POINTS_POSITION = (15, 10)
+    CELL_POINTS_POSITION = (15, 15)
+    ZERO_CELL_FONT_TYPE = 'arial.ttf'
+    ZERO_CELL_FONT_SIZE = 35
+    ZERO_CELL_FONT = ImageFont.truetype(ZERO_CELL_FONT_TYPE, ZERO_CELL_FONT_SIZE)
+    ZERO_CELL_POSITION = (10, 10)
+    TRANSPARENT_FILL = (0, 0, 0, 255)
 
-    row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), (255, 255, 255, 0))
-    for x, cell in enumerate(row):
+    draw_context = ImageDraw.Draw(cell_image)
+    if is_zero_cell:
+        draw_context.text(ZERO_CELL_POSITION, zero_call_label, font=ZERO_CELL_FONT, fill=TRANSPARENT_FILL)
+    else:
+        realm_points = cell_content.split(' ')[0]
+        draw_context.text(CELL_POINTS_POSITION, realm_points, font=CELL_POINTS_FONT, fill=TRANSPARENT_FILL)
 
-        cell_image = Image.new(RGBA, (REALM_WIDTH - REALM_BORDER * 2, REALM_HEIGHT - REALM_BORDER * 2), html_colour_to_rgba(cell[1]))
-        draw_context = ImageDraw.Draw(cell_image)
-        realm_points = cell[0].split(' ')[0]
-        draw_context.text(CELL_POINTS_POSITION, realm_points, font=CELL_POINTS_FONT, fill=(0, 0, 0, 255))
-        
-        # if len(cell[0].split(' ')) > 1:
-        #    realm_occupant = ' '.join(cell[0].split(' ')[1:])
-        #    draw_context.text((15, 40), realm_occupant, font=cell_font, fill=(0, 0, 0, 255))
 
+def get_one_row_image(zero_call_label: str, row_index: int, row_data: []) -> Image:
+    """Build one row image from the row data"""
+    row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), EMPTY_IMAGE_RGBA)
+    for cell_index, cell_data in enumerate(row_data):
+        cell_content, cell_colour = cell_data
+        cell_image = Image.new(RGBA, (REALM_WIDTH - REALM_BORDER * 2, REALM_HEIGHT - REALM_BORDER * 2),
+                               html_colour_to_rgba(cell_colour))
+        if row_index == 0 and cell_index == 0:
+            write_on_cell(cell_image, cell_content, True, zero_call_label) 
+        else:
+            write_on_cell(cell_image, cell_content)
         cell_image = ImageOps.expand(cell_image, REALM_BORDER)
-        
-        row_image.paste(cell_image, (x * REALM_WIDTH, 0))
+        row_image.paste(cell_image, (cell_index * REALM_WIDTH, 0))
     return row_image
 
 
-def build_turn_map(turn_result_filename: str) -> Image:
-    
-    for turn_table in get_table(open(turn_result_filename).read(), False):
-        result = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT * REALMS_MAX_Y), (255, 255, 255, 0))
-        for y, row in enumerate(turn_table):
-            result.paste(get_one_row_image(row), (0, y * REALM_HEIGHT))
-
-        yield result
+def get_one_map(map_label: str, is_turn_map: bool, result_filename: str) -> Image:
+    """builds one map"""
+    for one_table in get_table(open(result_filename).read(), is_turn_map):
+        one_map = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT * REALMS_MAX_Y), EMPTY_IMAGE_RGBA)
+        for row_index, row_data in enumerate(one_table):
+            one_map.paste(get_one_row_image(map_label, row_index, row_data), (0, row_index * REALM_HEIGHT))
+        yield one_map
     
         
 if __name__ == '__main__':
@@ -126,12 +140,11 @@ if __name__ == '__main__':
         '/Users/Dmitri Fedorov/Google Drive/cow2/CoW_Results_Game_2_Turn_4_NCR.html',
         '/Users/Dmitri Fedorov/Google Drive/cow2/CoW_Results_Game_2_Turn_5_NCR.html',
     ]
-    turn_maps = []
+    map_images = []
     for map_filename in map_filenames:
-        for image in build_turn_map(map_filename):
-            image.save('./image.gif')
-            turn_maps.append(imageio.imread('./image.gif'))
+        is_turn_map = True
+        for map_image in get_one_map('LBL', is_turn_map, map_filename):
+            map_images.append(numpy.array(map_image))
     
-    imageio.mimsave('turnsmap.gif', turn_maps, duration=2)
-    # turn_map.show()
+    imageio.mimsave('turnsmap.gif', map_images, duration=MAP_CHANGE_RATE_PER_SECOND)
     
