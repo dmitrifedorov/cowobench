@@ -18,9 +18,9 @@ limitations under the License.
 @author: Dmitri Fedorov
 @copyright: 2018 by EKDF Consulting and Dmitri Fedorov
 '''
-from plotly.utils import numpy
 
 MAP_CHANGE_RATE_PER_SECOND = 1
+MAP_FILENAME = 'turn6map.gif'
 
 REALM_WIDTH = 100
 REALM_HEIGHT = 100
@@ -32,7 +32,7 @@ EMPTY_IMAGE_RGBA = (255, 255, 255, 0)
 
 from html.parser import HTMLParser
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-import imageio
+import imageio, numpy
 
 
 def get_table(data: str, is_turn_map: bool) -> []:
@@ -89,14 +89,15 @@ def html_colour_to_rgba(html_colour: str) -> ():
 
 def write_on_cell(cell_image: Image, cell_content: str,
                is_zero_cell: bool=False, zero_call_label: str=None) -> ImageDraw.Draw:
+    """Write text on one cell"""
     CELL_POINTS_FONT_TYPE = 'arial.ttf'
     CELL_POINTS_FONT_SIZE = 35
     CELL_POINTS_FONT = ImageFont.truetype(CELL_POINTS_FONT_TYPE, CELL_POINTS_FONT_SIZE)
     CELL_POINTS_POSITION = (15, 15)
-    ZERO_CELL_FONT_TYPE = 'arial.ttf'
-    ZERO_CELL_FONT_SIZE = 35
+    ZERO_CELL_FONT_TYPE = 'arialbd.ttf'
+    ZERO_CELL_FONT_SIZE = 60
     ZERO_CELL_FONT = ImageFont.truetype(ZERO_CELL_FONT_TYPE, ZERO_CELL_FONT_SIZE)
-    ZERO_CELL_POSITION = (10, 10)
+    ZERO_CELL_POSITION = (3, 3)
     TRANSPARENT_FILL = (0, 0, 0, 255)
 
     draw_context = ImageDraw.Draw(cell_image)
@@ -125,26 +126,33 @@ def get_one_row_image(zero_call_label: str, row_index: int, row_data: []) -> Ima
 
 def get_one_map(map_label: str, is_turn_map: bool, result_filename: str) -> Image:
     """builds one map"""
-    for one_table in get_table(open(result_filename).read(), is_turn_map):
+    for table_index, one_table in enumerate(get_table(open(result_filename).read(), is_turn_map)):
         one_map = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT * REALMS_MAX_Y), EMPTY_IMAGE_RGBA)
         for row_index, row_data in enumerate(one_table):
-            one_map.paste(get_one_row_image(map_label, row_index, row_data), (0, row_index * REALM_HEIGHT))
+            one_map.paste(get_one_row_image(
+                map_label if is_turn_map else '{0}-{1}'.format(map_label, table_index), 
+                row_index, row_data), 
+                (0, row_index * REALM_HEIGHT))
         yield one_map
     
         
 if __name__ == '__main__':
+    print('Writing {0}...'.format(MAP_FILENAME))
     map_filenames = [
-        '/Users/Dmitri Fedorov/Google Drive/cow2/CoW_Results_Game_2_Turn_1_NCR.html',
-        '/Users/Dmitri Fedorov/Google Drive/cow2/CoW_Results_Game_2_Turn_2_NCR.html',
-        '/Users/Dmitri Fedorov/Google Drive/cow2/CoW_Results_Game_2_Turn_3_NCR.html',
-        '/Users/Dmitri Fedorov/Google Drive/cow2/CoW_Results_Game_2_Turn_4_NCR.html',
-        '/Users/Dmitri Fedorov/Google Drive/cow2/CoW_Results_Game_2_Turn_5_NCR.html',
+        ('T1', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_1_NCR.html'),
+        ('T2', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_2_NCR.html'),
+        ('T3', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_3_NCR.html'),
+        ('4', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_4.html'),
+        ('T4', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_4_NCR.html'),
+        ('5', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_5.html'),
+        ('T5', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_5_NCR.html'),
+        ('6', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_6.html'),
+        ('T6', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html'),
     ]
     map_images = []
-    for map_filename in map_filenames:
-        is_turn_map = True
-        for map_image in get_one_map('LBL', is_turn_map, map_filename):
+    for label, is_turn_map, map_filename in map_filenames:
+        for map_image in get_one_map(label, is_turn_map, map_filename):
             map_images.append(numpy.array(map_image))
-    
-    imageio.mimsave('turnsmap.gif', map_images, duration=MAP_CHANGE_RATE_PER_SECOND)
+    imageio.mimsave(MAP_FILENAME, map_images, duration=MAP_CHANGE_RATE_PER_SECOND)
+    print('Done')
     
