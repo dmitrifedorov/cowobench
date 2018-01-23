@@ -19,7 +19,7 @@ limitations under the License.
 @copyright: 2018 by EKDF Consulting and Dmitri Fedorov
 '''
 
-MAP_CHANGE_RATE_PER_SECOND = 3
+MAP_CHANGE_RATE_PER_SECOND = 1
 MAP_FILENAME = 'turn6map'
 
 REALM_WIDTH = 100
@@ -108,7 +108,6 @@ def write_on_cell(cell_image: Image, cell_content: str,
         realm_points = cell_content.split(' ')[0]
         draw_context.text(CELL_POINTS_POSITION, realm_points, font=CELL_POINTS_FONT, fill=TRANSPARENT_FILL)
 
-
 def get_one_row_image(zero_call_label: str, row_index: int, row_data: []) -> Image:
     """Build one row image from the row data"""
     row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), EMPTY_IMAGE_RGBA)
@@ -120,6 +119,16 @@ def get_one_row_image(zero_call_label: str, row_index: int, row_data: []) -> Ima
             write_on_cell(cell_image, cell_content, True, zero_call_label)
         else:
             write_on_cell(cell_image, cell_content)
+            
+        if len(cell_content.split(' ')) > 1:
+            cell_symbol = cell_content.split(' ')[1].strip()
+            if cell_symbol in ['*']:
+                cell_icon = Image.open('crossed-swords.png').resize((70, 70))
+                cell_image.paste(cell_icon, (15, 15), cell_icon)
+            if cell_symbol in ['+']:
+                cell_icon = Image.open('dagger-knife.png').resize((70, 70))
+                cell_image.paste(cell_icon, (15, 15), cell_icon)
+            
         cell_image = ImageOps.expand(cell_image, REALM_BORDER)
         row_image.paste(cell_image, (cell_index * REALM_WIDTH, 0))
     return row_image
