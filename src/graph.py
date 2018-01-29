@@ -143,7 +143,7 @@ VR = namedtuple('VR', 'c, d, pi')
 WHITE = 'WHITE'
 GREY = 'GREY'
 BLACK = 'BLACK'
-DEFAULT_WHITE = VR(WHITE, 0, None)
+DEFAULT_WHITE = VR(WHITE, None, None)
 
 
 def get_lists(_: str, is_turn_map: bool, result_filename: str) -> Image:
@@ -199,8 +199,7 @@ def bfs(start: XY, adj_lists: {}) -> {}:
         u = vertex_queue.get()
         for v in adj_lists[u].list:
             if adj_lists[v].vr.c == WHITE:
-                d = adj_lists[v].vr.d + 1 if adj_lists[v].vr.d else 1
-                adj_lists = colour_vertex(adj_lists, v, GREY, d, u)
+                adj_lists = colour_vertex(adj_lists, v, GREY, adj_lists[u].vr.d + 1, u)
                 vertex_queue.put(v)
         adj_lists = colour_vertex(adj_lists, u, BLACK, adj_lists[u].vr.d, adj_lists[u].vr.pi)
     return adj_lists
