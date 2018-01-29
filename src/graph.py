@@ -100,34 +100,35 @@ HOME_VERTEX = XY(2, 20)
 
 def get_adj_lists(turnmap_filename: str) -> {}:
     for one_table in get_table(open(turnmap_filename).read(), True):
-        all_vertices = get_all_vertices(one_table)
-        vertex_adj_lists = {}
-        for curr_vertix in all_vertices.keys():
-            if not is_wall(all_vertices, curr_vertix):
-                adj_list = [step for step in get_adj_cell(all_vertices, curr_vertix)]
-                vertex_adj_lists[curr_vertix] = AdjList(get_value(all_vertices, curr_vertix), adj_list, DEFAULT_WHITE)
-        return vertex_adj_lists
+        return { k: v for k, v in get_vertex_adj_lists(get_all_vertices(one_table)) }
 
 
-def get_value(vertices: {}, xy: XY) -> int:
+def get_vertex_adj_lists(all_vertices: {}, defaul_colour: VR=DEFAULT_WHITE) -> AdjList:
+    for curr_vertex in all_vertices.keys():
+        if not is_wall(all_vertices, curr_vertex):
+            adj_list = [x for x in get_adj_cell(all_vertices, curr_vertex)]
+            yield curr_vertex, AdjList(get_vertex_value(all_vertices, curr_vertex), adj_list, defaul_colour)
+
+
+def get_vertex_value(vertices: {}, xy: XY) -> int:
     return int(vertices[xy].split(' ')[0])
 
 
 def is_wall(vertices: {}, xy: XY) -> bool:
-    return get_value(vertices, xy) == WALL_VALUE
+    return get_vertex_value(vertices, xy) == WALL_VALUE
 
 
 def is_on_map(xy: XY) -> bool:
     return (xy.x > REALMS_MIN_X and xy.x < REALMS_MAX_X) and (xy.y > REALMS_MIN_X and xy.y < REALMS_MAX_Y) 
 
 
-def get_adj_cell(vertices: {}, vertix: XY) -> ():
-    for xc in [vertix.x - 1, vertix.x + 1]:
-        step = XY(xc, vertix.y)
+def get_adj_cell(vertices: {}, vertex: XY) -> ():
+    for xc in [vertex.x - 1, vertex.x + 1]:
+        step = XY(xc, vertex.y)
         if is_on_map(step) and not is_wall(vertices, step):
             yield step
-    for yc in [vertix.y - 1, vertix.y + 1]:
-        step = XY(vertix.x, yc)
+    for yc in [vertex.y - 1, vertex.y + 1]:
+        step = XY(vertex.x, yc)
         if is_on_map(step) and not is_wall(vertices, step):
             yield step
 
