@@ -103,7 +103,7 @@ def get_adj_lists(turnmap_filename: str) -> {}:
         return { k: v for k, v in get_vertex_adj_lists(get_all_vertices(one_table)) }
 
 
-def get_vertex_adj_lists(all_vertices: {}, defaul_colour: VR=DEFAULT_WHITE) -> AdjList:
+def get_vertex_adj_lists(all_vertices: {}, defaul_colour: VR=DEFAULT_WHITE) -> ():
     for curr_vertex in all_vertices.keys():
         if not is_wall(all_vertices, curr_vertex):
             adj_list = [x for x in get_adj_cell(all_vertices, curr_vertex)]
@@ -137,7 +137,7 @@ def get_all_vertices(one_table: []) -> {}:
     return { k: v for k, v in get_vertex(one_table) }
 
 
-def get_vertex(one_table: []):
+def get_vertex(one_table: []) -> ():
     for row_index, row_data in get_row(one_table):
         for column_index, cell_data in get_column(row_data):
             yield XY(row_index, column_index), cell_data[0]
@@ -174,19 +174,72 @@ def bfs(start: XY, vertex_adj_lists: {}) -> {}:
     return vertex_adj_lists
 
 
-def get_turn_adj_lists(vertex_adj_lists: {}, start: XY):
+def get_turn_adj_lists(vertex_adj_lists: {}, start: XY) -> {}:
     turn_adj_lists = bfs(start, copy.deepcopy(vertex_adj_lists))
     return { k: v for k, v in turn_adj_lists.items() if v.vr.d <= 3 }
+
+
+def get_turn_cmd(distance: int) -> str:
+    if distance == 2:
+        for cmd in ['DSS', 'SDS', 'SSD']:  # has two variants
+            yield cmd
+    elif distance == 3:
+        yield 'SSS'  # ignore
+    elif distance == 0:
+        yield 'DDD'
+    elif distance == 1:
+        for cmd in ['SDD', 'DSD', 'DDS']:
+            yield cmd
 
 # (x, y): ( w, list[(x, y)], (c, d, pi) )
 
 
+def get_points(from_xy: XY, to_xy: XY, cmd: str) -> int:
+    if cmd in ['DDD']:
+        yield dig(from_xy) + dig(from_xy) + dig(from_xy)
+    elif cmd in ['SDD']:
+        yield dig(to_xy) + dig(to_xy)
+    elif cmd in ['DSD']:
+        yield dig(from_xy) + dig(to_xy)
+    elif cmd in ['DDS']:
+        yield dig(from_xy) + dig(from_xy)
+    elif cmd in ['DSS']:
+        yield dig(from_xy)
+    elif cmd in ['SDS']:
+        if from_xy.x == to_xy.x:
+            through_xy = XY(from_xy.x, (from_xy.y + to_xy.y) / 2)
+            yield dig(through_xy)
+        elif from_xy.y == to_xy.y:
+            through_xy = XY((from_xy.x + to_xy.x) / 2, from_xy.y)
+            yield dig(through_xy)
+        else:
+            for through_xy in [XY(from_xy.x, to_xy.y), XY(to_xy.x, from_xy.y)]:
+                yield dig(through_xy)
+    elif cmd in ['SSD']:
+        return vertex_adj_lists[to_xy].w
+    return 0
+
+
+def dig(xy: XY) -> int:
+    points = turn_vertex_adj_lists[xy].w
+    curr_adj_list = turn_vertex_adj_lists[xy]
+    turn_vertex_adj_lists[xy] = AdjList(points - 1, curr_adj_list.list, curr_adj_list.vr) 
+    return points
+
+
 if __name__ == '__main__':
+
+
     map_filenames = [
         '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html',
     ]
     for map_filename in map_filenames:
         vertex_adj_lists = get_adj_lists(map_filename)
         # print(vertex_adj_lists)
-        turn_adj_lists = get_turn_adj_lists(vertex_adj_lists, HOME_VERTEX)
-        print(turn_adj_lists)
+        from_vertex = HOME_VERTEX
+        turn_adj_lists = get_turn_adj_lists(vertex_adj_lists, from_vertex)
+        for to_vertex in turn_adj_lists:
+            for cmd in get_turn_cmd(turn_adj_lists[to_vertex].vr.d):
+                turn_vertex_adj_lists = copy.deepcopy(vertex_adj_lists)
+                for points in get_points(from_vertex, to_vertex, cmd):
+                    print('{5} {4}: {0},{1}->{2},{3}'.format(from_vertex.x, from_vertex.y, to_vertex.x, to_vertex.y, cmd, points))
