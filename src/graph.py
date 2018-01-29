@@ -31,6 +31,7 @@ from html.parser import HTMLParser
 from collections import namedtuple
 import queue, copy
 
+
 def get_table(data: str, is_turn_map: bool) -> []:
     """Give the data, yields one curr_table"""
 
@@ -132,35 +133,43 @@ def get_adj_cell(vertices: {}, vertix: XY) -> ():
 
 
 def get_all_vertices(one_table: []) -> {}:
-    vertices = {}
+    return { k: v for k, v in get_vertex(one_table) }
+
+
+def get_vertex(one_table: []):
+    for row_index, row_data in get_row(one_table):
+        for column_index, cell_data in get_column(row_data):
+            yield XY(row_index, column_index), cell_data[0]
+
+
+def get_row(one_table: []) -> {}:
     for row_index, row_data in enumerate(one_table):
         if row_index > REALMS_MIN_Y:
-            for column_index, cell_data in enumerate(row_data):
-                if column_index > REALMS_MIN_X:
-                    vertices[XY(row_index, column_index)] = cell_data[0]
-    return vertices
+            yield row_index, row_data
+
+            
+def get_column(row_data: []) -> {}:
+    for column_index, cell_data in enumerate(row_data):
+        if column_index > REALMS_MIN_X:
+            yield column_index, cell_data[0]
 
 
 def colour_vertex(vertex_adj_lists: {}, xy: XY, c: str, d: int=0, p: XY=None):
-    for x, y in vertex_adj_lists:
-        if XY(x, y) == xy:
-            curr_adj_list = vertex_adj_lists[xy]
-            vertex_adj_lists[XY(x, y)] = AdjList(curr_adj_list.w, curr_adj_list.list, VR(c, d, p))
-            break 
-    return vertex_adj_lists
+    curr_adj_list = vertex_adj_lists[xy]
+    vertex_adj_lists[xy] = AdjList(curr_adj_list.w, curr_adj_list.list, VR(c, d, p))
 
 
 def bfs(start: XY, vertex_adj_lists: {}) -> {}:
-    vertex_adj_lists = colour_vertex(vertex_adj_lists, start, GREY)
+    colour_vertex(vertex_adj_lists, start, GREY)
     vertex_queue = queue.Queue()
     vertex_queue.put(start)
     while not vertex_queue.empty():
         u = vertex_queue.get()
         for v in vertex_adj_lists[u].list:
             if vertex_adj_lists[v].vr.c == WHITE:
-                vertex_adj_lists = colour_vertex(vertex_adj_lists, v, GREY, vertex_adj_lists[u].vr.d + 1, u)
+                colour_vertex(vertex_adj_lists, v, GREY, vertex_adj_lists[u].vr.d + 1, u)
                 vertex_queue.put(v)
-        vertex_adj_lists = colour_vertex(vertex_adj_lists, u, BLACK, vertex_adj_lists[u].vr.d, vertex_adj_lists[u].vr.pi)
+        colour_vertex(vertex_adj_lists, u, BLACK, vertex_adj_lists[u].vr.d, vertex_adj_lists[u].vr.pi)
     return vertex_adj_lists
 
 
@@ -168,12 +177,15 @@ def get_turn_adj_lists(vertex_adj_lists: {}, start: XY):
     turn_adj_lists = bfs(start, copy.deepcopy(vertex_adj_lists))
     return { k: v for k, v in turn_adj_lists.items() if v.vr.d <= 3 }
 
+# (x, y): ( w, list[(x, y)], (c, d, pi) )
+
+
 if __name__ == '__main__':
     map_filenames = [
         '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html',
     ]
     for map_filename in map_filenames:
         vertex_adj_lists = get_adj_lists(map_filename)
-        #print(vertex_adj_lists)
+        # print(vertex_adj_lists)
         turn_adj_lists = get_turn_adj_lists(vertex_adj_lists, HOME_VERTEX)
         print(turn_adj_lists)
