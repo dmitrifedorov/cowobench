@@ -164,9 +164,9 @@ def bfs(start: XY, vertex_adj_lists: {}) -> {}:
     return vertex_adj_lists
 
 
-def get_turn_steps(vertex_adj_lists: {}, start: XY):
-    turn_steps = bfs(start, copy.deepcopy(vertex_adj_lists))
-    return { k: v for k, v in turn_steps.items() if v.vr.d <= 3 }
+def get_turn_adj_lists(vertex_adj_lists: {}, start: XY):
+    turn_adj_lists = bfs(start, copy.deepcopy(vertex_adj_lists))
+    return { k: v for k, v in turn_adj_lists.items() if v.vr.d <= 3 }
 
 if __name__ == '__main__':
     map_filenames = [
@@ -174,5 +174,6 @@ if __name__ == '__main__':
     ]
     for map_filename in map_filenames:
         vertex_adj_lists = get_adj_lists(map_filename)
-        for x, y in get_turn_steps(vertex_adj_lists, XY(2, 20)):
-            print(vertex_adj_lists[x, y])
+        #print(vertex_adj_lists)
+        turn_adj_lists = get_turn_adj_lists(vertex_adj_lists, HOME_VERTEX)
+        print(turn_adj_lists)
