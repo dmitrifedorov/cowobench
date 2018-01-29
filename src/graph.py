@@ -32,9 +32,8 @@ EMPTY_IMAGE_RGBA = (255, 255, 255, 0)
 
 from html.parser import HTMLParser
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-import imageio, numpy
-imageio.plugins.ffmpeg.download()
-
+from collections import namedtuple
+import queue
 
 def get_table(data: str, is_turn_map: bool) -> []:
     """Give the data, yields one curr_table"""
@@ -108,6 +107,7 @@ def write_on_cell(cell_image: Image, cell_content: str,
         realm_points = cell_content.split(' ')[0]
         draw_context.text(CELL_POINTS_POSITION, realm_points, font=CELL_POINTS_FONT, fill=TRANSPARENT_FILL)
 
+
 def get_one_row_image(zero_call_label: str, row_index: int, row_data: []) -> Image:
     """Build one row image from the row data"""
     row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), EMPTY_IMAGE_RGBA)
@@ -134,49 +134,86 @@ def get_one_row_image(zero_call_label: str, row_index: int, row_data: []) -> Ima
     return row_image
 
 
-def get_one_map(map_label: str, is_turn_map: bool, result_filename: str) -> Image:
+XY = namedtuple('XY', 'x, y')
+AdjList = namedtuple('AdjList', 'w, list, vr')
+
+# (x, y): ( w, list[(x, y)], (c, d, pi) )
+
+VR = namedtuple('VR', 'c, d, pi')
+WHITE = 'WHITE'
+GREY = 'GREY'
+BLACK = 'BLACK'
+DEFAULT_WHITE = VR(WHITE, 0, None)
+
+
+def get_lists(_: str, is_turn_map: bool, result_filename: str) -> Image:
     """builds one map"""
     for _, one_table in enumerate(get_table(open(result_filename).read(), is_turn_map)):
-        
-        adjacency_list = {}
+        vertex_weights, MAX_ROW_INDEX, MAX_COLUMN_INDEX = get_vertex_weights(one_table)
+        adj_lists = {}
+        for x, y in vertex_weights:
+            value = int(vertex_weights[x, y].split(' ')[0])
+            adj_list = []
+            if value > 0:
+                adj_list = get_adj_list(vertex_weights, x - 1, y, x - 1, MAX_COLUMN_INDEX, adj_list)
+                adj_list = get_adj_list(vertex_weights, x + 1, y, x + 1, MAX_COLUMN_INDEX, adj_list)
+                adj_list = get_adj_list(vertex_weights, x, y - 1, y - 1, MAX_ROW_INDEX, adj_list)
+                adj_list = get_adj_list(vertex_weights, x, y + 1, y + 1, MAX_ROW_INDEX, adj_list)
+            adj_lists[XY(x, y)] = AdjList(value, adj_list, DEFAULT_WHITE)
+        yield adj_lists
 
-        weights = {}
-        MAX_ROW_INDEX = 0
-        MAX_COLUMN_INDEX = 0
-        for row_index, row_data in enumerate(one_table):
-            MAX_ROW_INDEX = row_index
-            for column_index, cell_data in enumerate(row_data):
-                MAX_COLUMN_INDEX = column_index
-                if row_index > 0 and column_index > 0:
-                    weights[(row_index, column_index)] = cell_data[0]
+def get_adj_list(vertex_weights, x, y, i, max_index, adj_list):
+    if i > 0 and i < max_index:
+        value = int(vertex_weights[x, y].split(' ')[0])
+        if value > 0:
+            adj_list.append(XY(x, y))
+    return adj_list
 
-        for vertix in weights:
-            adjacency_list[vertix] = (int(weights[vertix].split(' ')[0]), [])
-            left_cell_index = vertix[0] - 1
-            if left_cell_index > 0 and left_cell_index < MAX_COLUMN_INDEX:
-                adjacency_list[vertix][1].append(get_value(weights, left_cell_index, vertix[1]))
-            right_cell_index = vertix[0] + 1
-            if right_cell_index > 0 and right_cell_index < MAX_COLUMN_INDEX:
-                adjacency_list[vertix][1].append(get_value(weights, right_cell_index, vertix[1]))
-            upper_cell_index = vertix[1] - 1
-            if upper_cell_index > 0 and upper_cell_index < MAX_ROW_INDEX:
-                adjacency_list[vertix][1].append(get_value(weights, vertix[0], upper_cell_index))
-            lower_cell_index = vertix[1] + 1
-            if lower_cell_index > 0 and lower_cell_index < MAX_ROW_INDEX:
-                adjacency_list[vertix][1].append(get_value(weights, vertix[0], lower_cell_index))
-        
-        yield adjacency_list
+def get_vertex_weights(one_table: []) -> {}:
+    vertex_weights = {}
+    MAX_ROW_INDEX = 0
+    MAX_COLUMN_INDEX = 0
+    for row_index, row_data in enumerate(one_table):
+        MAX_ROW_INDEX = row_index
+        for column_index, cell_data in enumerate(row_data):
+            MAX_COLUMN_INDEX = column_index
+            if row_index > 0 and column_index > 0:
+                vertex_weights[(row_index, column_index)] = cell_data[0]
+    return vertex_weights, MAX_ROW_INDEX, MAX_COLUMN_INDEX 
 
-def get_value(weights: [], x: int, y: int) -> ():
-    value = int(weights[x, y].split(' ')[0])
-    return (x, y, None if value == 0 else value)
+
+def colour_vertex(adj_lists: {}, xy: XY, c: str, d: int=0, p: XY=None):
+    for x, y in adj_lists:
+        if XY(x, y) == xy:
+            curr_adj_list = adj_lists[xy]
+            adj_lists[XY(x, y)] = AdjList(curr_adj_list.w, curr_adj_list.list, VR(c, d, p))
+            break 
+    return adj_lists
+
+
+def bfs(start: XY, adj_lists: {}) -> {}:
+    adj_lists = colour_vertex(adj_lists, start, GREY)
+    vertex_queue = queue.Queue()
+    vertex_queue.put(start)
+    while not vertex_queue.empty():
+        u = vertex_queue.get()
+        for v in adj_lists[u].list:
+            if adj_lists[v].vr.c == WHITE:
+                d = adj_lists[v].vr.d + 1 if adj_lists[v].vr.d else 1
+                adj_lists = colour_vertex(adj_lists, v, GREY, d, u)
+                vertex_queue.put(v)
+        adj_lists = colour_vertex(adj_lists, u, BLACK, adj_lists[u].vr.d, adj_lists[u].vr.pi)
+    return adj_lists
 
 if __name__ == '__main__':
     map_filenames = [
         ('T6', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html'),
     ]
     for label, is_turn_map, map_filename in map_filenames:
-        for adjacency_list in get_one_map(label, is_turn_map, map_filename):
-            print(adjacency_list)
-            print(len(adjacency_list))
+        for adj_lists in get_lists(label, is_turn_map, map_filename):
+            result = bfs(XY(2, 20), adj_lists)
+            print(result)
 
+            #print(result)
+            # for item in result:
+            #    print(item, result[item])
