@@ -174,72 +174,136 @@ def bfs(start: XY, vertex_adj_lists: {}) -> {}:
     return vertex_adj_lists
 
 
+def is_owner_me(xy: XY) -> bool:
+    if xy.y < 16: return False
+    if xy.y > 22: return False
+    if xy.x > 12: return False
+    if xy.y == 16:
+        if xy.x < 5: return False
+    if xy.y == 22:
+        if xy.x < 8: return False
+        if xy.x > 9: return False
+    return True
+
+
 def get_turn_adj_lists(vertex_adj_lists: {}, start: XY) -> {}:
     turn_adj_lists = bfs(start, copy.deepcopy(vertex_adj_lists))
-    return { k: v for k, v in turn_adj_lists.items() if v.vr.d <= 3 }
+    return { k: v for k, v in turn_adj_lists.items() if (v.vr.d <= 3) and is_owner_me(k)}
 
 
 def get_turn_cmd(distance: int) -> str:
-    if distance == 2:
-        for cmd in ['DSS', 'SDS', 'SSD']:  # has two variants
+    if distance == 3:
+        yield 'SSS'
+    elif distance == 2:
+        for cmd in ['DSS', 'SDS', 'SSD']:
             yield cmd
-    elif distance == 3:
-        yield 'SSS'  # ignore
-    elif distance == 0:
-        yield 'DDD'
     elif distance == 1:
         for cmd in ['SDD', 'DSD', 'DDS']:
             yield cmd
+    elif distance == 0:
+        yield 'DDD'
+    
 
-# (x, y): ( w, list[(x, y)], (c, d, pi) )
-
-
-def get_points(from_xy: XY, to_xy: XY, cmd: str) -> int:
+def get_points(from_xy: XY, to_xy: XY, cmd: str, dig_map: {}) -> int:
     if cmd in ['DDD']:
-        yield dig(from_xy) + dig(from_xy) + dig(from_xy)
+        yield dig(from_xy, dig_map) + dig(from_xy, dig_map) + dig(from_xy, dig_map)
     elif cmd in ['SDD']:
-        yield dig(to_xy) + dig(to_xy)
+        yield dig(to_xy, dig_map) + dig(to_xy, dig_map)
     elif cmd in ['DSD']:
-        yield dig(from_xy) + dig(to_xy)
+        yield dig(from_xy, dig_map) + dig(to_xy, dig_map)
     elif cmd in ['DDS']:
-        yield dig(from_xy) + dig(from_xy)
+        yield dig(from_xy, dig_map) + dig(from_xy, dig_map)
     elif cmd in ['DSS']:
-        yield dig(from_xy)
+        yield dig(from_xy, dig_map)
     elif cmd in ['SDS']:
         if from_xy.x == to_xy.x:
             through_xy = XY(from_xy.x, (from_xy.y + to_xy.y) / 2)
-            yield dig(through_xy)
+            yield dig(through_xy, dig_map)
         elif from_xy.y == to_xy.y:
             through_xy = XY((from_xy.x + to_xy.x) / 2, from_xy.y)
-            yield dig(through_xy)
+            yield dig(through_xy, dig_map)
         else:
             for through_xy in [XY(from_xy.x, to_xy.y), XY(to_xy.x, from_xy.y)]:
-                yield dig(through_xy)
+                yield dig(through_xy, dig_map)
     elif cmd in ['SSD']:
-        return vertex_adj_lists[to_xy].w
-    return 0
+        yield dig(to_xy, dig_map)
+    elif cmd in ['SSS']:
+        yield 0
 
 
-def dig(xy: XY) -> int:
-    points = turn_vertex_adj_lists[xy].w
-    curr_adj_list = turn_vertex_adj_lists[xy]
-    turn_vertex_adj_lists[xy] = AdjList(points - 1, curr_adj_list.list, curr_adj_list.vr) 
+def dig(xy: XY, dig_map: {}) -> int:
+    points = dig_map[xy].w
+    curr_adj_list = dig_map[xy]
+    dig_map[xy] = AdjList(points - 1, curr_adj_list.list, curr_adj_list.vr) 
     return points
+
+Path = namedtuple('Path', 'points, start, finish, cmd, adj_lists')
+
+def process_turn():
+    # second turn
+    prev_turn_paths = first_turn_paths
+    next_turn_paths = []
+    for index, prev_turn_path in enumerate(prev_turn_paths):
+        from_vertex = prev_turn_path.finish
+        turn_adj_lists = get_turn_adj_lists(vertex_adj_lists, from_vertex)
+        prev_turn_adj_lists = prev_turn_path.adj_lists
+        for prev_turn_adj_list in prev_turn_adj_lists:
+            if prev_turn_adj_list in turn_adj_lists.keys():
+                prev_weight = prev_turn_adj_lists[prev_turn_adj_list].w
+                curr_adj_list = turn_adj_lists[prev_turn_adj_list]
+                turn_adj_lists[prev_turn_adj_list] = AdjList(prev_weight, curr_adj_list.list, curr_adj_list.vr)
+        
+        for to_vertex in turn_adj_lists:
+            for cmd in get_turn_cmd(turn_adj_lists[to_vertex].vr.d):
+                turn_vertex_adj_lists = copy.deepcopy(turn_adj_lists)
+                for points in get_points(from_vertex, to_vertex, cmd, turn_vertex_adj_lists):
+                    next_turn_paths.append(Path(points, from_vertex, to_vertex, cmd, copy.deepcopy(turn_vertex_adj_lists)))
 
 
 if __name__ == '__main__':
-
-
     map_filenames = [
         '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html',
     ]
     for map_filename in map_filenames:
         vertex_adj_lists = get_adj_lists(map_filename)
-        # print(vertex_adj_lists)
+
         from_vertex = HOME_VERTEX
+        # first turn
+        first_turn_paths = []
         turn_adj_lists = get_turn_adj_lists(vertex_adj_lists, from_vertex)
         for to_vertex in turn_adj_lists:
             for cmd in get_turn_cmd(turn_adj_lists[to_vertex].vr.d):
-                turn_vertex_adj_lists = copy.deepcopy(vertex_adj_lists)
-                for points in get_points(from_vertex, to_vertex, cmd):
-                    print('{5} {4}: {0},{1}->{2},{3}'.format(from_vertex.x, from_vertex.y, to_vertex.x, to_vertex.y, cmd, points))
+                turn_vertex_adj_lists = copy.deepcopy(turn_adj_lists)
+                for points in get_points(from_vertex, to_vertex, cmd, turn_vertex_adj_lists):
+                    first_turn_paths.append(Path(points, from_vertex, to_vertex, cmd, copy.deepcopy(turn_vertex_adj_lists)))
+
+        # second turn
+        prev_turn_paths = first_turn_paths
+        next_turn_paths = []
+        for index, prev_turn_path in enumerate(prev_turn_paths):
+            from_vertex = prev_turn_path.finish
+            turn_adj_lists = get_turn_adj_lists(vertex_adj_lists, from_vertex)
+            prev_turn_adj_lists = prev_turn_path.adj_lists
+            for prev_turn_adj_list in prev_turn_adj_lists:
+                if prev_turn_adj_list in turn_adj_lists.keys():
+                    prev_weight = prev_turn_adj_lists[prev_turn_adj_list].w
+                    curr_adj_list = turn_adj_lists[prev_turn_adj_list]
+                    turn_adj_lists[prev_turn_adj_list] = AdjList(prev_weight, curr_adj_list.list, curr_adj_list.vr)
+            
+            for to_vertex in turn_adj_lists:
+                for cmd in get_turn_cmd(turn_adj_lists[to_vertex].vr.d):
+                    turn_vertex_adj_lists = copy.deepcopy(turn_adj_lists)
+                    for points in get_points(from_vertex, to_vertex, cmd, turn_vertex_adj_lists):
+                        next_turn_paths.append(Path(points, from_vertex, to_vertex, cmd, copy.deepcopy(turn_vertex_adj_lists)))
+        
+
+        most_points = 0
+        path = None
+        for first_turn_path in first_turn_paths:
+            for next_turn_path in next_turn_paths:
+                if first_turn_path.finish == next_turn_path.start:
+                    total = first_turn_path.points + next_turn_path.points
+                    if total > most_points:
+                        most_points = total
+                        path = (first_turn_path, next_turn_path)
+        print(most_points, path)
