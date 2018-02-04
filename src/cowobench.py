@@ -20,10 +20,10 @@ limitations under the License.
 '''
 
 MAP_CHANGE_RATE_PER_SECOND = 1
-MAP_FILENAME = 'turn6map'
+MAP_FILENAME = 'recon7map'
 
-REALM_WIDTH = 100
-REALM_HEIGHT = 100
+REALM_WIDTH = 50
+REALM_HEIGHT = 50
 REALM_BORDER = 1
 REALMS_MAX_X = 32
 REALMS_MAX_Y = REALMS_MAX_X
@@ -34,6 +34,8 @@ from html.parser import HTMLParser
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import imageio, numpy
 imageio.plugins.ffmpeg.download()
+
+known_units = []
 
 
 def get_table(data: str, is_turn_map: bool) -> []:
@@ -89,16 +91,16 @@ def html_colour_to_rgba(html_colour: str) -> ():
 
 
 def write_on_cell(cell_image: Image, cell_content: str,
-               is_zero_cell: bool=False, zero_call_label: str=None) -> ImageDraw.Draw:
+                  is_zero_cell: bool=False, zero_call_label: str=None):
     """Write text on one cell"""
     CELL_POINTS_FONT_TYPE = 'arial.ttf'
-    CELL_POINTS_FONT_SIZE = 35
+    CELL_POINTS_FONT_SIZE = 18
     CELL_POINTS_FONT = ImageFont.truetype(CELL_POINTS_FONT_TYPE, CELL_POINTS_FONT_SIZE)
-    CELL_POINTS_POSITION = (15, 15)
+    CELL_POINTS_POSITION = (7, 7)
     ZERO_CELL_FONT_TYPE = 'arialbd.ttf'
-    ZERO_CELL_FONT_SIZE = 60
+    ZERO_CELL_FONT_SIZE = 30
     ZERO_CELL_FONT = ImageFont.truetype(ZERO_CELL_FONT_TYPE, ZERO_CELL_FONT_SIZE)
-    ZERO_CELL_POSITION = (3, 3)
+    ZERO_CELL_POSITION = (1, 1)
     TRANSPARENT_FILL = (0, 0, 0, 255)
 
     draw_context = ImageDraw.Draw(cell_image)
@@ -108,7 +110,19 @@ def write_on_cell(cell_image: Image, cell_content: str,
         realm_points = cell_content.split(' ')[0]
         draw_context.text(CELL_POINTS_POSITION, realm_points, font=CELL_POINTS_FONT, fill=TRANSPARENT_FILL)
 
-def get_one_row_image(zero_call_label: str, row_index: int, row_data: []) -> Image:
+
+def write_table_index(cell_image: Image, table_index: int):
+    """Write table index on one cell"""
+    CELL_POINTS_FONT_TYPE = 'arialbd.ttf'
+    CELL_POINTS_FONT_SIZE = 18
+    CELL_POINTS_FONT = ImageFont.truetype(CELL_POINTS_FONT_TYPE, CELL_POINTS_FONT_SIZE)
+    CELL_POINTS_POSITION = (19, 19)
+    TEXT_FILL = (0, 0, 0, 255)
+    draw_context = ImageDraw.Draw(cell_image)
+    draw_context.text(CELL_POINTS_POSITION, str(table_index), font=CELL_POINTS_FONT, fill=TEXT_FILL)
+
+
+def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, row_data: []) -> Image:
     """Build one row image from the row data"""
     row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), EMPTY_IMAGE_RGBA)
     for cell_index, cell_data in enumerate(row_data):
@@ -116,30 +130,39 @@ def get_one_row_image(zero_call_label: str, row_index: int, row_data: []) -> Ima
         cell_image = Image.new(RGBA, (REALM_WIDTH - REALM_BORDER * 2, REALM_HEIGHT - REALM_BORDER * 2),
                                html_colour_to_rgba(cell_colour))
         if row_index == 0 and cell_index == 0:
-            write_on_cell(cell_image, cell_content, True, zero_call_label)
+            write_on_cell(cell_image, cell_content, True, zero_cell_label)
         else:
             write_on_cell(cell_image, cell_content)
-            
+        
+        for known_unit in known_units:
+            if (known_unit[0], known_unit[1]) == (row_index, cell_index):
+                cell_image.paste(known_unit[2], (7, 7), known_unit[2])
+        
         if len(cell_content.split(' ')) > 1:
             cell_symbol = cell_content.split(' ')[1].strip()
             if cell_symbol in ['*']:
-                cell_icon = Image.open('crossed-swords.png').resize((70, 70))
-                cell_image.paste(cell_icon, (15, 15), cell_icon)
+                cell_icon = Image.open('crossed-swords.png').resize((35, 35))
+                cell_image.paste(cell_icon, (7, 7), cell_icon)
+                write_table_index(cell_icon, table_index)
+                known_units.append((row_index, cell_index, cell_icon))
             if cell_symbol in ['+']:
-                cell_icon = Image.open('dagger-knife.png').resize((70, 70))
-                cell_image.paste(cell_icon, (15, 15), cell_icon)
+                cell_icon = Image.open('dagger-knife.png').resize((35, 35))
+                cell_image.paste(cell_icon, (7, 7), cell_icon)
+                write_table_index(cell_icon, table_index)
+                known_units.append((row_index, cell_index, cell_icon))
             
         cell_image = ImageOps.expand(cell_image, REALM_BORDER)
         row_image.paste(cell_image, (cell_index * REALM_WIDTH, 0))
     return row_image
 
 
-def get_one_map(map_label: str, is_turn_map: bool, result_filename: str) -> Image:
+def get_adj_lists(map_label: str, is_turn_map: bool, turnmap_filename: str) -> Image:
     """builds one map"""
-    for table_index, one_table in enumerate(get_table(open(result_filename).read(), is_turn_map)):
+    for table_index, one_table in enumerate(get_table(open(turnmap_filename).read(), is_turn_map)):
         one_map = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT * REALMS_MAX_Y), EMPTY_IMAGE_RGBA)
         for row_index, row_data in enumerate(one_table):
             one_map.paste(get_one_row_image(
+                table_index,
                 map_label if is_turn_map else '{0}-{1}'.format(map_label, table_index),
                 row_index, row_data),
                 (0, row_index * REALM_HEIGHT))
@@ -158,11 +181,16 @@ if __name__ == '__main__':
         ('T5', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_5_NCR.html'),
         ('6', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_6.html'),
         ('T6', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html'),
+        ('7', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_7.html'),
+        ('T7', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_7_NCR.html'),
     ]
     map_images = []
+    last_image = None
     for label, is_turn_map, map_filename in map_filenames:
-        for map_image in get_one_map(label, is_turn_map, map_filename):
+        for map_image in get_adj_lists(label, is_turn_map, map_filename):
             map_images.append(numpy.array(map_image))
+            last_image = map_image
+    # map_image.save('{0}.gif'.format(MAP_FILENAME), format='gif')
     imageio.mimsave('{0}.gif'.format(MAP_FILENAME), map_images, duration=MAP_CHANGE_RATE_PER_SECOND)
     print('Animated GIF done.')
     writer = imageio.get_writer('{0}.mp4'.format(MAP_FILENAME), fps=1)
