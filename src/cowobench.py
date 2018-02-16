@@ -21,7 +21,9 @@ limitations under the License.
 
 MAP_CHANGE_RATE_PER_SECOND = 1
 MAP_FILENAME = 'turn8map'
-#MAP_FILENAME = 'recon8map'
+
+DO_RECON = True
+
 
 REALM_WIDTH = 50
 REALM_HEIGHT = 50
@@ -37,7 +39,7 @@ import imageio, numpy
 imageio.plugins.ffmpeg.download()
 
 known_units = []
-
+known_digs = []
 
 def get_table(data: str, is_turn_map: bool) -> []:
     """Give the data, yields one curr_table"""
@@ -123,7 +125,7 @@ def write_table_index(cell_image: Image, table_index: int):
     draw_context.text(CELL_POINTS_POSITION, str(table_index), font=CELL_POINTS_FONT, fill=TEXT_FILL)
 
 
-def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, row_data: []) -> Image:
+def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, row_data: [], prev_row_data: []) -> Image:
     """Build one row image from the row data"""
     row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), EMPTY_IMAGE_RGBA)
     for cell_index, cell_data in enumerate(row_data):
@@ -135,10 +137,21 @@ def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, ro
         else:
             write_on_cell(cell_image, cell_content)
         
-        if False:
+        if DO_RECON:
             for known_unit in known_units:
                 if (known_unit[0], known_unit[1]) == (row_index, cell_index):
                     cell_image.paste(known_unit[2], (7, 7), known_unit[2])
+            for known_dig in known_digs:
+                if (known_dig[0], known_dig[1]) == (row_index, cell_index):
+                    cell_image.paste(known_dig[2], (7, 7), known_dig[2])
+            if prev_row_data:
+                curr_cell_content = cell_content.split(' ')[0].strip()
+                prev_cell_content = prev_row_data[cell_index][0].split(' ')[0].strip()
+                if not prev_cell_content == curr_cell_content:
+                    cell_icon = Image.open('dig.png').resize((35, 35))
+                    cell_image.paste(cell_icon, (7, 7), cell_icon)
+                    write_table_index(cell_icon, table_index)
+                    known_digs.append((row_index, cell_index, cell_icon))
         
         if len(cell_content.split(' ')) > 1:
             cell_symbol = cell_content.split(' ')[1].strip()
@@ -146,12 +159,14 @@ def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, ro
                 cell_icon = Image.open('crossed-swords.png').resize((35, 35))
                 cell_image.paste(cell_icon, (7, 7), cell_icon)
                 write_table_index(cell_icon, table_index)
-                known_units.append((row_index, cell_index, cell_icon))
+                if DO_RECON:
+                    known_units.append((row_index, cell_index, cell_icon))
             if cell_symbol in ['+']:
                 cell_icon = Image.open('dagger-knife.png').resize((35, 35))
                 cell_image.paste(cell_icon, (7, 7), cell_icon)
                 write_table_index(cell_icon, table_index)
-                known_units.append((row_index, cell_index, cell_icon))
+                if DO_RECON:
+                    known_units.append((row_index, cell_index, cell_icon))
             
         cell_image = ImageOps.expand(cell_image, REALM_BORDER)
         row_image.paste(cell_image, (cell_index * REALM_WIDTH, 0))
@@ -160,14 +175,17 @@ def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, ro
 
 def get_adj_lists(map_label: str, is_turn_map: bool, turnmap_filename: str) -> Image:
     """builds one map"""
+    prev_imp_table = None
     for table_index, one_table in enumerate(get_table(open(turnmap_filename).read().replace('<b>9</b>', '9'), is_turn_map)):
         one_map = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT * REALMS_MAX_Y), EMPTY_IMAGE_RGBA)
         for row_index, row_data in enumerate(one_table):
             one_map.paste(get_one_row_image(
                 table_index,
                 map_label if is_turn_map else '{0}-{1}'.format(map_label, table_index),
-                row_index, row_data),
+                row_index, row_data,
+                prev_imp_table[row_index] if prev_imp_table else None),
                 (0, row_index * REALM_HEIGHT))
+        prev_imp_table = one_table
         yield one_map
 
 
@@ -177,16 +195,16 @@ if __name__ == '__main__':
         #('T1', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_1_NCR.html'),
         #('T2', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_2_NCR.html'),
         #('T3', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_3_NCR.html'),
-        ('4', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_4.html'),
-        ('T4', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_4_NCR.html'),
-        ('5', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_5.html'),
-        ('T5', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_5_NCR.html'),
-        ('6', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_6.html'),
-        ('T6', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html'),
-        ('7', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_7.html'),
-        ('T7', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_7_NCR.html'),
-        ('8', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_8.html'),
-        ('T8', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_8_NCR.html'),
+        #('4', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_4.html'),
+        #('T4', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_4_NCR.html'),
+        #('5', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_5.html'),
+        #('T5', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_5_NCR.html'),
+        #('6', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_6.html'),
+        #('T6', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html'),
+        #('7', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_7.html'),
+        #('T7', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_7_NCR.html'),
+        ('8', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_8e.html'),
+        #('T8', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_8_NCR.html'),
     ]
     map_images = []
     last_image = None
@@ -194,12 +212,15 @@ if __name__ == '__main__':
         for map_image in get_adj_lists(label, is_turn_map, map_filename):
             map_images.append(numpy.array(map_image))
             last_image = map_image
-    map_image.save('{0}.gif'.format(MAP_FILENAME), format='gif')
-    #imageio.mimsave('{0}.gif'.format(MAP_FILENAME), map_images, duration=MAP_CHANGE_RATE_PER_SECOND)
-    print('Animated GIF done.')
-    writer = imageio.get_writer('{0}.mp4'.format(MAP_FILENAME), fps=1)
-    for map_image in map_images:
-        writer.append_data(map_image)
-    writer.close()
-    print('MP4 done.')
+    if DO_RECON:
+        last_image.save('{0}-recon.gif'.format(MAP_FILENAME), format='gif')
+        print('Recon GIF done.')
+    else:
+        imageio.mimsave('{0}.gif'.format(MAP_FILENAME), map_images, duration=MAP_CHANGE_RATE_PER_SECOND)
+        print('Animated GIF done.')
+        writer = imageio.get_writer('{0}.mp4'.format(MAP_FILENAME), fps=1)
+        for map_image in map_images:
+            writer.append_data(map_image)
+        writer.close()
+        print('MP4 done.')
 
