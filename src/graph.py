@@ -101,7 +101,7 @@ LOWEST_POINTS = 5
 
 
 def get_adj_lists(turnmap_filename: str) -> {}:
-    for one_table in get_table(open(turnmap_filename).read(), True):
+    for one_table in get_table(open(turnmap_filename).read().replace('<b>9</b>', '9').replace('<i>', ' ').replace('</i>', ''), True):
         return { k: v for k, v in get_vertex_adj_lists(get_all_vertices(one_table)) }
 
 
@@ -176,6 +176,44 @@ def bfs(start: XY, vertex_adj_lists: {}) -> {}:
     return vertex_adj_lists
 
 
+def dfs(start: XY, vertex_adj_lists: {}) -> {}:
+    return dfs_visit(1, start, vertex_adj_lists)
+
+TURN_LIMIT = 20
+
+max_points = 0
+total_points = 0
+
+max_path = []
+same_path = []
+curr_path = []
+
+def dfs_visit(turn: int, u: XY, vertex_adj_lists: {}) -> {}:
+    curr_path.append(u)
+    global total_points
+    total_points = total_points + vertex_adj_lists[u].w if turn > 1 else 0
+    result = vertex_adj_lists
+    colour_vertex(vertex_adj_lists, u, GREY)
+    for v in vertex_adj_lists[u].list:
+        if vertex_adj_lists[v].vr.c == WHITE:           
+            colour_vertex(vertex_adj_lists, v, WHITE, vertex_adj_lists[u].vr.d, u)
+            if turn <= TURN_LIMIT:
+                result = dfs_visit(turn + 1, v, vertex_adj_lists)
+    global max_points
+    global max_path
+    global same_path
+    if total_points > max_points:
+        max_points = total_points 
+        max_path = [x for x in curr_path]
+        same_path = []
+    elif total_points == max_points:
+        same_path.append([x for x in curr_path])
+    colour_vertex(vertex_adj_lists, u, BLACK) # visited
+    total_points = total_points - vertex_adj_lists[u].w if turn > 1 else 0
+    curr_path.pop()
+    return result
+
+
 def is_owner_me(xy: XY) -> bool:
     if xy.y < 16: return False
     if xy.y > 22: return False
@@ -189,8 +227,10 @@ def is_owner_me(xy: XY) -> bool:
 
 
 def get_turn_adj_lists(vertex_adj_lists: {}, start: XY) -> {}:
-    turn_adj_lists = bfs(start, copy.deepcopy(vertex_adj_lists))
-    return { k: v for k, v in turn_adj_lists.items() if (v.vr.d <= 3) and is_owner_me(k) }
+    #turn_adj_lists = bfs(start, copy.deepcopy(vertex_adj_lists))
+    turn_adj_lists = dfs(start, copy.deepcopy(vertex_adj_lists))
+    #return { k: v for k, v in turn_adj_lists.items() if (v.vr.d <= 3) and is_owner_me(k) }
+    return { k: v for k, v in turn_adj_lists.items() if (v.vr.c == BLACK) and is_owner_me(k) }
 
 
 def get_turn_cmd(distance: int) -> str:
@@ -289,18 +329,27 @@ def get_first_turn(master_map: {}):
 
 if __name__ == '__main__':
     map_filenames = [
-        '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html',
+        '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_9_NCR.html',
     ]
     for map_filename in map_filenames:
         vertex_adj_lists = get_adj_lists(map_filename)
+        print(len(vertex_adj_lists))
 
-        first_turn_paths = get_first_turn(vertex_adj_lists)
-        print(len(first_turn_paths))
-        second_turn_paths = process_turn(first_turn_paths, vertex_adj_lists)
-        print(len(second_turn_paths))
-        third_turn_paths = process_turn(second_turn_paths, vertex_adj_lists)
-        print(len(third_turn_paths))
+        from_vertex = HOME_VERTEX
+        first_turn_paths = []
+        turn_adj_lists = get_turn_adj_lists(vertex_adj_lists, from_vertex)
+        print(len(turn_adj_lists))
+        #print([x for x in list(max_path.queue)])
+        print(max_points, max_path)
+        print([x for x in same_path])
+        #first_turn_paths = get_first_turn(vertex_adj_lists)
+        #print(len(first_turn_paths))
+        #second_turn_paths = process_turn(first_turn_paths, vertex_adj_lists)
+        #print(len(second_turn_paths))
+        #third_turn_paths = process_turn(second_turn_paths, vertex_adj_lists)
+        #print(len(third_turn_paths))
         
+        quit(0)
         most_points = 0
         path = None
         for first_turn_path in first_turn_paths:
@@ -314,6 +363,6 @@ if __name__ == '__main__':
         
         print(most_points, path[0].start, path[0].finish, path[0].cmd, path[1].start, path[1].finish, path[1].cmd, path[2].start, path[2].finish, path[2].cmd)
 
-        #print(path[0].master_map)
-        #print(path[1].master_map)
-        #print(path[2].master_map)
+        # print(path[0].master_map)
+        # print(path[1].master_map)
+        # print(path[2].master_map)
