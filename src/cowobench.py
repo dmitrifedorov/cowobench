@@ -20,7 +20,7 @@ limitations under the License.
 '''
 
 MAP_CHANGE_RATE_PER_SECOND = 1
-MAP_FILENAME = 'turn789map'
+MAP_FILENAME = 'turn10map'
 
 DO_RECON = False
 
@@ -201,12 +201,14 @@ if __name__ == '__main__':
         #('T5', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_5_NCR.html'),
         #('6', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_6.html'),
         #('T6', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html'),
-        ('7', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_7.html'),
-        ('T7', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_7_NCR.html'),
-        ('8', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_8.html'),
-        ('T8', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_8_NCR.html'),
+        #('7', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_7.html'),
+        #('T7', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_7_NCR.html'),
+        #('8', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_8.html'),
+        #('T8', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_8_NCR.html'),
         ('9', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_9.html'),
         ('T9', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_9_NCR.html'),
+        ('10', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_10.html'),
+        ('T10', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_10_NCR.html'),
     ]
     map_images = []
     last_image = None
@@ -226,3 +228,4 @@ if __name__ == '__main__':
         writer.close()
         print('MP4 done.')
 
+        
