@@ -20,10 +20,9 @@ limitations under the License.
 '''
 
 MAP_CHANGE_RATE_PER_SECOND = 1
-MAP_FILENAME = 'turn10map'
+MAP_FILENAME = 'turn15map'
 
-DO_RECON = False
-
+DO_RECON = True
 
 REALM_WIDTH = 50
 REALM_HEIGHT = 50
@@ -40,6 +39,7 @@ imageio.plugins.ffmpeg.download()
 
 known_units = []
 known_digs = []
+
 
 def get_table(data: str, is_turn_map: bool) -> []:
     """Give the data, yields one curr_table"""
@@ -114,6 +114,18 @@ def write_on_cell(cell_image: Image, cell_content: str,
         draw_context.text(CELL_POINTS_POSITION, realm_points, font=CELL_POINTS_FONT, fill=TRANSPARENT_FILL)
 
 
+def write_unit(cell_image: Image, unit: str):
+    """Write text on one cell"""
+    CELL_POINTS_FONT_TYPE = 'seguisym.ttf'
+    CELL_POINTS_FONT_SIZE = 10
+    CELL_POINTS_FONT = ImageFont.truetype(CELL_POINTS_FONT_TYPE, CELL_POINTS_FONT_SIZE)
+    CELL_POINTS_POSITION = (0, 35)
+    TRANSPARENT_FILL = (255, 255, 255, 255)
+
+    draw_context = ImageDraw.Draw(cell_image)
+    draw_context.text(CELL_POINTS_POSITION, unit, font=CELL_POINTS_FONT, fill=TRANSPARENT_FILL)
+
+
 def write_table_index(cell_image: Image, table_index: int):
     """Write table index on one cell"""
     CELL_POINTS_FONT_TYPE = 'arialbd.ttf'
@@ -154,19 +166,24 @@ def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, ro
                     known_digs.append((row_index, cell_index, cell_icon))
         
         if len(cell_content.split(' ')) > 1:
-            cell_symbol = cell_content.split(' ')[1].strip()
+            cell_contents = cell_content.split(' ')
+            cell_symbol = cell_contents[1].strip()
             if cell_symbol in ['*']:
                 cell_icon = Image.open('crossed-swords.png').resize((35, 35))
                 cell_image.paste(cell_icon, (7, 7), cell_icon)
                 write_table_index(cell_icon, table_index)
                 if DO_RECON:
                     known_units.append((row_index, cell_index, cell_icon))
-            if cell_symbol in ['+']:
+            elif cell_symbol in ['+']:
                 cell_icon = Image.open('dagger-knife.png').resize((35, 35))
                 cell_image.paste(cell_icon, (7, 7), cell_icon)
                 write_table_index(cell_icon, table_index)
                 if DO_RECON:
                     known_units.append((row_index, cell_index, cell_icon))
+            else:
+                unit = cell_contents[-1] if not cell_contents[-1] == 'A' else cell_contents[-2]
+                if not unit.isdigit() and DO_RECON:
+                    write_unit(cell_image, unit)
             
         cell_image = ImageOps.expand(cell_image, REALM_BORDER)
         row_image.paste(cell_image, (cell_index * REALM_WIDTH, 0))
@@ -176,7 +193,15 @@ def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, ro
 def get_adj_lists(map_label: str, is_turn_map: bool, turnmap_filename: str) -> Image:
     """builds one map"""
     prev_imp_table = None
-    for table_index, one_table in enumerate(get_table(open(turnmap_filename).read().replace('<b>9</b>', '9').replace('<i>', ' ').replace('</i>', ''), is_turn_map)):
+    for table_index, one_table in enumerate(
+        get_table(open(turnmap_filename).read()
+                  .replace('<b>', ' ').replace('</b>', ' ')
+                  .replace('<i>x1</i>', ' ').replace('<i>x2</i>', ' ').replace('<i>x3</i>', ' ').replace('<i>x4</i>', ' ')
+                  .replace('<i>x5</i>', ' ').replace('<i>x6</i>', ' ').replace('<i>x7</i>', ' ').replace('<i>x8</i>', ' ')
+                  .replace('<i>X1</i>', ' ').replace('<i>X2</i>', ' ').replace('<i>X3</i>', ' ').replace('<i>X4</i>', ' ')
+                  .replace('<i>X5</i>', ' ').replace('<i>X6</i>', ' ').replace('<i>X7</i>', ' ').replace('<i>X8</i>', ' ')
+                  .replace('<i>', ' ').replace('</i>', ' '),
+                  is_turn_map)):
         one_map = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT * REALMS_MAX_Y), EMPTY_IMAGE_RGBA)
         for row_index, row_data in enumerate(one_table):
             one_map.paste(get_one_row_image(
@@ -192,23 +217,33 @@ def get_adj_lists(map_label: str, is_turn_map: bool, turnmap_filename: str) -> I
 if __name__ == '__main__':
     print('Writing {0}...'.format(MAP_FILENAME))
     map_filenames = [
-        #('T1', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_1_NCR.html'),
-        #('T2', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_2_NCR.html'),
-        #('T3', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_3_NCR.html'),
-        #('4', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_4.html'),
-        #('T4', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_4_NCR.html'),
-        #('5', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_5.html'),
-        #('T5', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_5_NCR.html'),
-        #('6', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_6.html'),
-        #('T6', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html'),
-        #('7', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_7.html'),
-        #('T7', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_7_NCR.html'),
-        #('8', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_8.html'),
-        #('T8', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_8_NCR.html'),
-        ('9', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_9.html'),
-        ('T9', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_9_NCR.html'),
-        ('10', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_10.html'),
-        ('T10', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_10_NCR.html'),
+        # ('T1', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_1_NCR.html'),
+        # ('T2', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_2_NCR.html'),
+        # ('T3', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_3_NCR.html'),
+        # ('4', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_4.html'),
+        # ('T4', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_4_NCR.html'),
+        # ('5', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_5.html'),
+        # ('T5', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_5_NCR.html'),
+        # ('6', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_6.html'),
+        # ('T6', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html'),
+        # ('7', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_7.html'),
+        # ('T7', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_7_NCR.html'),
+        # ('8', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_8.html'),
+        # ('T8', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_8_NCR.html'),
+        # ('9', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_9.html'),
+        # ('T9', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_9_NCR.html'),
+        #('10', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_10.html'),
+        #('T10', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_10_NCR.html'),
+        #('11', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_11.html'),
+        #('T11', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_11_NCR.html'),
+        #('12', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_12.html'),
+        #('T12', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_12_NCR.html'),
+        #('13', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_13.html'),
+        #('T13', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_13_NCR.html'),
+        #('14', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_14.html'),
+        ('T14', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_14_NCR.html'),
+        ('15', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_15.html'),
+        ('T15', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_15_NCR.html'),
     ]
     map_images = []
     last_image = None
@@ -219,13 +254,11 @@ if __name__ == '__main__':
     if DO_RECON:
         last_image.save('{0}-recon.gif'.format(MAP_FILENAME), format='gif')
         print('Recon GIF done.')
-    else:
-        imageio.mimsave('{0}.gif'.format(MAP_FILENAME), map_images, duration=MAP_CHANGE_RATE_PER_SECOND)
-        print('Animated GIF done.')
-        writer = imageio.get_writer('{0}.mp4'.format(MAP_FILENAME), fps=1)
-        for map_image in map_images:
-            writer.append_data(map_image)
-        writer.close()
-        print('MP4 done.')
-
+    imageio.mimsave('{0}.gif'.format(MAP_FILENAME), map_images, duration=MAP_CHANGE_RATE_PER_SECOND)
+    print('Animated GIF done.')
+    writer = imageio.get_writer('{0}.mp4'.format(MAP_FILENAME), fps=1)
+    for map_image in map_images:
+        writer.append_data(map_image)
+    writer.close()
+    print('MP4 done.')
         
