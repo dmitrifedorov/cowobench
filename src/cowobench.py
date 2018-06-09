@@ -20,7 +20,7 @@ limitations under the License.
 '''
 
 MAP_CHANGE_RATE_PER_SECOND = 1
-MAP_FILENAME = 'turn15map'
+MAP_FILENAME = 'turn5map'
 
 DO_RECON = True
 
@@ -28,7 +28,7 @@ REALM_WIDTH = 50
 REALM_HEIGHT = 50
 REALM_BORDER = 1
 REALMS_MAX_X = 32
-REALMS_MAX_Y = REALMS_MAX_X
+REALMS_MAX_Y = 38
 RGBA = 'RGBA'
 EMPTY_IMAGE_RGBA = (255, 255, 255, 0)
 
@@ -217,33 +217,17 @@ def get_adj_lists(map_label: str, is_turn_map: bool, turnmap_filename: str) -> I
 if __name__ == '__main__':
     print('Writing {0}...'.format(MAP_FILENAME))
     map_filenames = [
-        # ('T1', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_1_NCR.html'),
-        # ('T2', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_2_NCR.html'),
-        # ('T3', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_3_NCR.html'),
-        # ('4', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_4.html'),
-        # ('T4', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_4_NCR.html'),
-        # ('5', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_5.html'),
-        # ('T5', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_5_NCR.html'),
-        # ('6', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_6.html'),
-        # ('T6', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_6_NCR.html'),
-        # ('7', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_7.html'),
-        # ('T7', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_7_NCR.html'),
-        # ('8', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_8.html'),
-        # ('T8', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_8_NCR.html'),
-        # ('9', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_9.html'),
-        # ('T9', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_9_NCR.html'),
-        #('10', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_10.html'),
-        #('T10', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_10_NCR.html'),
-        #('11', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_11.html'),
-        #('T11', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_11_NCR.html'),
-        #('12', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_12.html'),
-        #('T12', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_12_NCR.html'),
-        #('13', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_13.html'),
-        #('T13', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_13_NCR.html'),
-        #('14', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_14.html'),
-        ('T14', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_14_NCR.html'),
-        ('15', False, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_impulse_map_Turn_15.html'),
-        ('T15', True, '/Users/Dmitri Fedorov/Google Drive/cow2/turnmaps/CoW_Results_Game_2_Turn_15_NCR.html'),
+        ('T0', True, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_Results_Game_BS-1_Turn_0_NCR.html'),
+        #('1', False, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_impulse_map_Turn_1.html'),
+        ('T1', True, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_Results_Game_BS-1_Turn_1_NCR.html'),
+        #('2', False, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_impulse_map_Turn_2.html'),
+        ('T2', True, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_Results_Game_BS-1_Turn_2_NCR.html'),
+        #('3', False, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_impulse_map_Turn_3.html'),
+        ('T3', True, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_Results_Game_BS-1_Turn_3_NCR.html'),
+        #('4', False, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_impulse_map_Turn_4.html'),
+        #('T4', True, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_Results_Game_BS-1_Turn_4_NCR.html'),
+        ('5', False, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_impulse_map_Turn_5.html'),
+        ('T5', True, '/Users/Dmitri Fedorov/Google Drive/cow-bs/CoW_Results_Game_BS-1_Turn_5_NCR.html'),
     ]
     map_images = []
     last_image = None
