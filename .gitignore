@@ -104,3 +104,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+.vs/cowobench/v16/.suo
+.vs/ProjectSettings.json
+*.sqlite
+.vs/VSWorkspaceState.json
+.vscode/launch.json
+*.mp4

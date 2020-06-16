@@ -1,4 +1,4 @@
-#!/usr/bin/python3.8
+#!/usr/bin/python
 '''
 Copyright 2018 by EKDF Consulting and Dmitri Fedorov
 
@@ -16,33 +16,44 @@ limitations under the License.
 
 @author: Dmitri Fedorov
 @copyright: 2020 by EKDF Consulting and Dmitri Fedorov
-@file cowobench.py
+@file: cowfart.py
 '''
 
-# makes a movie out of results and generates a recon map
 
 RESULT_DIRECTORY = "C:\\Users\\dfedorov\\!nosync\\!cow"
-
-MAP_CHANGE_RATE_PER_SECOND = 10
 
 REALM_WIDTH = 50
 REALM_HEIGHT = 50
 REALM_BORDER = 1
 REALMS_MAX_X = 38
 REALMS_MAX_Y = 38
+PLAN_LINE_WIDTH = 10
+TOTAL_IMPULSES = 10
 
-EMPTY_IMAGE_RGBA = (255, 255, 255, 0)
-RGBA = 'RGBA'
+EMPTY_IMAGE_RGBA = (255, 255, 255)  #  , 0)
+RGBA = 'RGB'
+HOME_COLOUR = '#666600'
+HOME_X = 31
+HOME_Y = 7
 
-from html.parser import HTMLParser
-from PIL import Image, ImageDraw, ImageFont, ImageOps
-import imageio, numpy, os, datetime, itertools
-from collections import namedtuple
-
-do_recon = False
+do_recon = True
 known_units = []
 known_digs = []
 
+from html.parser import HTMLParser
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+from string import ascii_uppercase
+import imageio
+import numpy
+import os
+import datetime
+import itertools
+from collections import namedtuple
+
+Move = namedtuple('Move', 'unit, limbo, impulses, at')
+XY_Move = namedtuple('XY_Move', 'unit, xy_moves')
+Upgrade = namedtuple('Upgrade', 'unit, type, cost')
+TurnOrders = namedtuple('TurnOrders', 'turn, faction, commands')
 XY = namedtuple('XY', 'x, y')
 UnitIconPosition = namedtuple('UnitIconPosition', 'icon, position')
 
@@ -210,105 +221,71 @@ def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, ro
     return row_image
 
 
-def get_adj_lists(map_label: str, is_turn_map: bool, turnmap_filename: str) -> Image:
-    """builds one map"""
-    prev_imp_table = None
-    print('Processing file {0}...'.format(turnmap_filename))
-    for table_index, one_table in enumerate(get_table(open(turnmap_filename).read()
-                  .replace('<b>', ' ').replace('</b>', ' ')
-                  .replace('<i>x1</i>', ' ').replace('<i>x2</i>', ' ').replace('<i>x3</i>', ' ').replace('<i>x4</i>', ' ')
-                  .replace('<i>x5</i>', ' ').replace('<i>x6</i>', ' ').replace('<i>x7</i>', ' ').replace('<i>x8</i>', ' ')
-                  .replace('<i>X1</i>', ' ').replace('<i>X2</i>', ' ').replace('<i>X3</i>', ' ').replace('<i>X4</i>', ' ')
-                  .replace('<i>X5</i>', ' ').replace('<i>X6</i>', ' ').replace('<i>X7</i>', ' ').replace('<i>X8</i>', ' ')
-                  .replace('<i>', ' ').replace('</i>', ' '),
-                  is_turn_map)):
-        print('Processing table {0}...'.format(table_index))
-        one_map = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT * REALMS_MAX_Y), EMPTY_IMAGE_RGBA)
-        for row_index, row_data in enumerate(one_table):
-            one_map.paste(get_one_row_image(table_index,
-                map_label if is_turn_map else '{0}-{1}'.format(map_label, table_index),
-                row_index, row_data,
-                prev_imp_table[row_index] if prev_imp_table else None),
-                (0, row_index * REALM_HEIGHT))
-        prev_imp_table = one_table
-        yield one_map
+def get_impulses(commands: str):
+    result = []
+    try:
+        command_iterator = commands.__iter__()
+        for command in command_iterator:
+            if command in ['N', 'S', 'W', 'E', '.', 'H', 'D', 'U', 'C']:
+                result.append(command)
+            elif command in ['T']:
+                teleport_command = []
+                while True:
+                    teleport_command.append(command_iterator.__next__())
+                    if teleport_command[-1] == ')':
+                        break
+                result.append(''.join(teleport_command))
+    except Exception as ex:
+        print(ex)
+    return result
 
 
-def get_map_images(map_filenames: []) -> ():
-    map_images = []
-    last_image = None
-    for label, is_turn_map, map_filename in map_filenames:
-        for map_image in get_adj_lists(label, is_turn_map, map_filename):
-            map_images.append(numpy.array(map_image))
-            last_image = map_image
-    return map_images, last_image
+def get_upgrades(orders_dir: str, orders_filename) -> TurnOrders:
+    with open(os.path.join(orders_dir, orders_filename), 'r') as orders_file:
+        commands = []
+        for line in orders_file:
+            if not line.lstrip().startswith('#') and len(line.strip()) > 0:
+                upgrade_tokens = list(filter(None, line.split(' ')))
+                if upgrade_tokens[0] in ['UPG', 'upg']:
+                    # expect UPG MD_NCR_7 SK # cost is 16 rp...
+                    upgrade_cost = int(upgrade_tokens[6])
+                    commands.append(Upgrade(upgrade_tokens[1], upgrade_tokens[2], upgrade_cost))
+        return TurnOrders(None, 'NCR', commands)
 
 
-def write_recon(last_image: Image, filename: str):
-    last_image.save(filename, format='gif')
-    print('Recon GIF done: {0}'.format(filename))
+def get_moves(orders_dir: str, orders_filename) -> TurnOrders:
+    with open(os.path.join(orders_dir, orders_filename), 'r') as orders_file:
+        commands = []
+        for line in orders_file:
+            if not line.lstrip().startswith('#') and len(line.strip()) > 0:
+                order_tokens = list(filter(None, line.strip().split(' ')))
+                if order_tokens[0] in ['MOV', 'mov']:
+                    # expect MOV MD_NCR_3 ESE.......  # Unit is at x35y11, has
+                    unit_at = order_tokens[7].strip(',')
+                    if unit_at in ['Limbo']:
+                        unit_at_x = HOME_X
+                        unit_at_y = HOME_Y
+                    else:
+                        unit_at_x = unit_at.split('y')[0].strip('x')
+                        unit_at_y = unit_at.split('y')[1]
+                    commands.append(Move(order_tokens[1],
+                                         unit_at in ['Limbo'],
+                                         get_impulses(order_tokens[2]),
+                                         XY(int(unit_at_x), int(unit_at_y))))
+        return TurnOrders(None, 'NCR', commands)
 
 
-def write_video(map_images: [], filename: str):
-    writer = imageio.get_writer(filename, fps=MAP_CHANGE_RATE_PER_SECOND)
-    last_map_image = None
-    for map_image in map_images:
-        for _ in range (0, MAP_CHANGE_RATE_PER_SECOND):
-            writer.append_data(map_image)
-        last_map_image = map_image
-    for _ in range (0, MAP_CHANGE_RATE_PER_SECOND*5):
-        writer.append_data(last_map_image)
-    writer.close()
-    print('Video done: {0}'.format(filename))
+def unit_moved(impulses):
+    count = 0
+    for i in range(0, TOTAL_IMPULSES):
+        if impulses[i] not in ['.']:
+            count += 1
+    return count
 
 
-# TODO: extract it from results file
-FACTION_HTML_COLOUR_MAP = {
-    'MUN': '#ff9900',
-    'WW':  '#cc9933',
-    'VUP': '#00cccc',
-    'AAK': '#ffcc66',
-    'CP':  '#006600',
-    'VOX': '#999900',
-    'TSC': '#993300',
-    'ABY': '#C00000',
-    'PAT': '#7030A0',
-    'ROD': '#00B0F0',
-    'BF4': '#66ffff',
-    'ALT': '#F4B084',
-    'NCR': '#666600',
-    'TBB': '#0070C0',
-    'WTF': '#cc66cc',
-    'SOL': '#3333ff',
-    'AP':  '#ffcc00',
-    'BF4': '#993399',
-    'DMT': '#ff0000',
-    }
-
-# TODO: extract it from results file
-FACTION_HOME_REALM_MAP = {
-    'CP':  XY(7, 7),
-    'SOL': XY(7, 19),
-    'AP':  XY(7, 31),
-    'WTF': XY(19, 7),
-    'VOX': XY(19, 19),
-    'BF4': XY(19, 31),
-    'NCR': XY(31, 7),
-    'VUP': XY(31, 19),
-    'DMT': XY(31, 31),
-    }
-
-
-def get_contrast_colour(hex_color: str, brightness_offset=50):
-    rgb_hex = [hex_color[x:x + 2] for x in [1, 3, 5]]
-    new_rgb_int = [int(hex_value, 16) + brightness_offset for hex_value in rgb_hex]
-    new_rgb_int = [min([255, max([0, i])]) for i in new_rgb_int]  # make sure new values are between 0 and 255
-    return "#" + "".join([hex(i)[2:] for i in new_rgb_int])
-
-    
 def get_result_files(dir_name: str):
     return get_named_files('CoW_Results_Game_g7_Turn_', dir_name)
-    
+
 
 def get_impulse_files(dir_name: str):
     return get_named_files('CoW_impulse_map_Turn_', dir_name)
@@ -329,59 +306,148 @@ def get_named_files(name: str, dir_name: str):
         except:
             pass
 
-
-def get_turn_map_files(work_dir: str):
-    MAX_TURNS = 100
-    impulse_files = [x for x in get_impulse_files(work_dir)]
-    result_files = [x for x in get_result_files(work_dir)]    
-    map_files = []
-    turn_result_count = None
-    for turn_number in range(0, MAX_TURNS):
-        impulse_file = next((x for x in impulse_files if x[0] == turn_number), None)
-        result_file = next((x for x in result_files if x[0] == turn_number), None)
-        if not impulse_file and not result_file:
-            break
-        if impulse_file:
-            map_files.append(('{0}'.format(turn_number), False, os.path.join(work_dir, impulse_file[2])))
-        if result_file:
-            map_files.append(('T{0}'.format(turn_number), True, os.path.join(work_dir, result_file[2])))
-        turn_result_count = turn_number
-    print('Found {0} result files'.format(turn_result_count))
-    last_turn_map_files = [x for i, x in enumerate(map_files) if x[1] and (i < turn_result_count * 2)]
-    last_turn_map_files.extend(map_files[-2:])
-    return turn_result_count, last_turn_map_files
+def read_file(turnmap_filename):
+    result = open(turnmap_filename).read()
+    result = result.replace('<b>', ' ').replace('</b>', ' ').replace('<i>', ' ').replace('</i>', ' ')
+    #.replace('<i>x1</i>', ' ').replace('<i>x2</i>', ' ').replace('<i>x3</i>',
+    #' ').replace('<i>x4</i>', ' ')
+    #.replace('<i>x5</i>', ' ').replace('<i>x6</i>', ' ').replace('<i>x7</i>',
+    #' ').replace('<i>x8</i>', ' ')
+    #.replace('<i>X1</i>', ' ').replace('<i>X2</i>', ' ').replace('<i>X3</i>',
+    #' ').replace('<i>X4</i>', ' ')
+    #.replace('<i>X5</i>', ' ').replace('<i>X6</i>', ' ').replace('<i>X7</i>',
+    #' ').replace('<i>X8</i>', ' ')
+    return result
 
 
-def main(do_recon, include_units, exclude_units, dir):
-    print('Collecting result files in directory {0}...'.format(dir))
-    turn_result_count, map_files = get_turn_map_files(dir)
+def get_maps(map_label: str, is_turn_map: bool, turnmap_filename: str) -> Image:
+    """builds one map"""
+    prev_imp_table = None
+    print('Processing file {0}...'.format(turnmap_filename))
+    for table_index, one_table in enumerate(get_table(read_file(turnmap_filename), is_turn_map)):
+        print('Processing table {0}...'.format(table_index))
+        one_map = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT * REALMS_MAX_Y), EMPTY_IMAGE_RGBA)
+        for row_index, row_data in enumerate(one_table):
+            one_map.paste(get_one_row_image(table_index,
+                                            '{0}-{1}'.format(map_label, table_index),
+                                            row_index, row_data,
+                                            prev_imp_table[row_index] if prev_imp_table else None),
+                          (0, row_index * REALM_HEIGHT))
+        prev_imp_table = one_table
+        yield one_map
+
+
+def get_contrast_colour(hex_color: str, brightness_offset=50):
+    rgb_hex = [hex_color[x:x + 2] for x in [1, 3, 5]]
+    new_rgb_int = [int(hex_value, 16) + brightness_offset for hex_value in rgb_hex]
+    new_rgb_int = [min([255, max([0, i])]) for i in new_rgb_int]  # make sure new values are between 0 and 255
+    return "#" + "".join([hex(i)[2:] for i in new_rgb_int])
+
+
+def get_unit_moves(unit_moves):
+    result = []
+    prev_move = None
+    for unit_move in unit_moves:
+        unit_moved = not (prev_move == unit_move) if prev_move else True
+        if unit_moved:
+            result.append(((unit_move.x+0.5)*REALM_WIDTH, (unit_move.y+0.5)*REALM_HEIGHT))
+        prev_move = unit_move
+    return result
+
+
+def draw_plan(xy_moves, last_image: Image) -> Image:
+    draw_context = ImageDraw.Draw(last_image)
+    for unit_name, unit_moves in xy_moves.items():
+        draw_context.line(get_unit_moves(unit_moves),
+                          fill=get_contrast_colour(HOME_COLOUR),
+                          width=PLAN_LINE_WIDTH)
+    return last_image
+
+moves_map = { 
+    '.': lambda curr: XY(curr.x, curr.y),
+    'H': lambda curr: XY(curr.x, curr.y),
+    'N': lambda curr: XY(curr.x, curr.y-1),
+    'S': lambda curr: XY(curr.x, curr.y+1),
+    'W': lambda curr: XY(curr.x-1, curr.y),
+    'E': lambda curr: XY(curr.x+1, curr.y),
+#    }
     
-    print('Extracting map image files from result files...')
-    map_images, last_image = get_map_images(map_files)
+#for port_letter in ascii_uppercase:
+#    moves_map['({0})'.format(port_letter)] =  lambda curr: XY(7, 1)
 
-    print('Writing Turn {0} results and plans...'.format(turn_result_count))
+    '(A)': lambda curr: XY(7, 1),
+    '(B)': lambda curr: XY(19, 1),
+    '(C)': lambda curr: XY(31, 1),
 
-    if do_recon:
-        print('Generating Turn {0} recon ...'.format(turn_result_count + 1))
-        write_recon(last_image, 'turn{0}-recon.gif'.format(turn_result_count + 1))
-        
-    # do not write the animated GIF because nobody wants it
-    # imageio.mimsave('{0}.gif'.format(map_filename), map_images,
-    # duration=MAP_CHANGE_RATE_PER_SECOND)
-    # print('Animated GIF done.')
+    '(D)': lambda curr: XY(1, 7),
+    '(E)': lambda curr: XY(13, 7),
+    '(F)': lambda curr: XY(25, 7),
+    '(G)': lambda curr: XY(37, 7),
+
+    '(H)': lambda curr: XY(7, 13),
+    '(I)': lambda curr: XY(19, 13),
+    '(J)': lambda curr: XY(31, 13),
+
+    '(K)': lambda curr: XY(1, 19),
+    '(L)': lambda curr: XY(13, 19),
+    '(M)': lambda curr: XY(25, 19),
+    '(N)': lambda curr: XY(37, 19),
+
+    '(O)': lambda curr: XY(7, 25),
+    '(P)': lambda curr: XY(19, 25),
+    '(Q)': lambda curr: XY(31, 25),
+
+    '(R)': lambda curr: XY(1, 31),
+    '(S)': lambda curr: XY(13, 31),
+    '(T)': lambda curr: XY(25, 31),
+    '(U)': lambda curr: XY(27, 31),
+
+    '(V)': lambda curr: XY(7, 37),
+    '(W)': lambda curr: XY(19, 37),
+    '(X)': lambda curr: XY(31, 37),
+    }
+
+def get_xy_moves(moves):
+    # transform into XY movements
+    result = {}
+    for unit_moves in moves:
+        # 'unit, limbo, impulses, at'
+        if unit_moves.limbo and (unit_moves.impulses == 'H.........'):
+            continue
+        curr = unit_moves.at
+        unit_xy_moves = [curr]
+        for i in unit_moves.impulses:
+            curr = moves_map[i](curr)
+            unit_xy_moves.append(curr)
+        if len(unit_xy_moves) == TOTAL_IMPULSES + 1:
+            result[unit_moves.unit] = unit_xy_moves
+        else:
+            raise Exception('Unexpected unit moves: {0}'.format(unit_moves))
+    return result
+
+def unit_move_const(unit_moves):
+    result = 0
+    result += sum(1 for i, _ in enumerate(unit_moves) if not unit_moves[i] == unit_moves[i-1])
+    return result
+
+def main(orders_dir, orders_filename):
+    xy_moves = get_xy_moves(get_moves(orders_dir, orders_filename).commands)
+
+    move_cost = sum(unit_move_const(unit_moves) for _, unit_moves in xy_moves.items())
+    print('Move cost: {0}'.format(move_cost))
+
+    upgrade_cost = sum(x.cost for x in get_upgrades(orders_dir, orders_filename).commands)
+    print('Upgrade cost: {0}'.format(upgrade_cost))
+
+    last_result_file = sorted([x for x in get_result_files(orders_dir)], key=lambda x: x[0])[-1]
+    last_impulse_file = sorted([x for x in get_impulse_files(orders_dir)], key=lambda x: x[0])[-1]
+
+    for last_file in [last_result_file, last_impulse_file]:
+        last_image = [x for x in get_maps(*last_file)][-1]
+
+    plan_image = draw_plan(xy_moves, last_image)
+    plan_image.save('turn{0}-plan.png'.format(last_impulse_file[0] + 1), format='png')
+
     
-    write_video(map_images, 'turn{0}-result.mp4'.format(turn_result_count))
-
-
 if __name__ == '__main__':
-    do_recon = True
-    main(do_recon, [], [], RESULT_DIRECTORY);
-    exit(0)
-    
-    import argparse
-    parser = argparse.ArgumentParser(description='Generate recon and plans.')
-    parser.add_argument('-d', '--dir', help='working directory', default='./')
-    parser.add_argument('-r', '--recon', help='generate recon', action='store_true', default=False)
-    args = parser.parse_args()
-    main(args.recon, args.dir);
-
+    main(RESULT_DIRECTORY, 'CoW_Orders_Game_g7_Turn_7_NCR.txt')
