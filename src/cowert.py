@@ -23,7 +23,7 @@ limitations under the License.
 # makes a movie from impulse files of one or more last turns
 
 RESULT_DIRECTORY = "C:\\Users\\dfedorov\\!nosync\\!cow"
-NUMBER_OF_TURNS = 2
+NUMBER_OF_TURNS = 3
 
 REALM_WIDTH = 50
 REALM_HEIGHT = 50
@@ -31,8 +31,8 @@ REALM_BORDER = 1
 REALMS_MAX_X = 38
 REALMS_MAX_Y = 38
 
-EMPTY_IMAGE_RGBA = (255, 255, 255, 0)
-RGBA = 'RGBA'
+EMPTY_IMAGE_RGBA = (255, 255, 255)
+RGBA = 'RGB'
 
 MAP_CHANGE_RATE_PER_SECOND = 10
 

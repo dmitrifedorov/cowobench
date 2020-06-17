@@ -31,8 +31,8 @@ REALM_BORDER = 1
 REALMS_MAX_X = 38
 REALMS_MAX_Y = 38
 
-EMPTY_IMAGE_RGBA = (255, 255, 255, 0)
-RGBA = 'RGBA'
+EMPTY_IMAGE_RGBA = (255, 255, 255)
+RGBA = 'RGB'
 
 from html.parser import HTMLParser
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -245,8 +245,8 @@ def get_map_images(map_filenames: []) -> ():
 
 
 def write_recon(last_image: Image, filename: str):
-    last_image.save(filename, format='gif')
-    print('Recon GIF done: {0}'.format(filename))
+    last_image.save(filename, format='png')
+    print('Recon PNG done: {0}'.format(filename))
 
 
 def write_video(map_images: [], filename: str):
@@ -363,12 +363,12 @@ def main(do_recon, include_units, exclude_units, dir):
 
     if do_recon:
         print('Generating Turn {0} recon ...'.format(turn_result_count + 1))
-        write_recon(last_image, 'turn{0}-recon.gif'.format(turn_result_count + 1))
+        write_recon(last_image, 'turn{0}-recon.png'.format(turn_result_count + 1))
         
-    # do not write the animated GIF because nobody wants it
-    # imageio.mimsave('{0}.gif'.format(map_filename), map_images,
+    # do not write the animated PNG because nobody wants it
+    # imageio.mimsave('{0}.png'.format(map_filename), map_images,
     # duration=MAP_CHANGE_RATE_PER_SECOND)
-    # print('Animated GIF done.')
+    # print('Animated PNG done.')
     
     write_video(map_images, 'turn{0}-result.mp4'.format(turn_result_count))
 
