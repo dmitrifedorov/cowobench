@@ -51,6 +51,7 @@ import datetime
 import itertools
 from collections import namedtuple
 
+
 Move = namedtuple('Move', 'unit, limbo, impulses, at')
 XY_Move = namedtuple('XY_Move', 'unit, xy_moves')
 Upgrade = namedtuple('Upgrade', 'unit, type, cost')
@@ -369,25 +370,6 @@ def draw_plan(xy_moves, last_image: Image) -> Image:
                           width=PLAN_LINE_WIDTH)
     return last_image
 
-teleport_names = iter(['({0})'.format(port_letter) for port_letter in ascii_uppercase])
-teleport_xs = [x for x in range(7, 43, 12)]
-teleport_xs.extend([x for x in range(1, 43, 12)])
-#teleport_xs = iter(teleport_ys)
-#teleport_ys = iter([y for y in range(1, 43, 6)])
-teleport_ys = [y for y in range(1, 43, 6)]
-
-#while True:
-#    name = next(teleport_names, None)
-#    if name:
-#        #x = next(teleport_xs, None)
-#        #y = next(teleport_ys, None)
-#        for x in teleport_xs:
-#            for y in teleport_ys:
-#                print(name, x, y)
-#        #else:
-#        #    break
-#    else:
-#        break;
 
 moves_map = { 
     '.': lambda curr: XY(curr.x, curr.y),
@@ -396,39 +378,29 @@ moves_map = {
     'S': lambda curr: XY(curr.x, curr.y+1),
     'W': lambda curr: XY(curr.x-1, curr.y),
     'E': lambda curr: XY(curr.x+1, curr.y),
-#    }    
-
-    '(A)': lambda curr: XY(7, 1),
-    '(B)': lambda curr: XY(19, 1),
-    '(C)': lambda curr: XY(31, 1),
-
-    '(D)': lambda curr: XY(1, 7),
-    '(E)': lambda curr: XY(13, 7),
-    '(F)': lambda curr: XY(25, 7),
-    '(G)': lambda curr: XY(37, 7),
-
-    '(H)': lambda curr: XY(7, 13),
-    '(I)': lambda curr: XY(19, 13),
-    '(J)': lambda curr: XY(31, 13),
-
-    '(K)': lambda curr: XY(1, 19),
-    '(L)': lambda curr: XY(13, 19),
-    '(M)': lambda curr: XY(25, 19),
-    '(N)': lambda curr: XY(37, 19),
-
-    '(O)': lambda curr: XY(7, 25),
-    '(P)': lambda curr: XY(19, 25),
-    '(Q)': lambda curr: XY(31, 25),
-
-    '(R)': lambda curr: XY(1, 31),
-    '(S)': lambda curr: XY(13, 31),
-    '(T)': lambda curr: XY(25, 31),
-    '(U)': lambda curr: XY(27, 31),
-
-    '(V)': lambda curr: XY(7, 37),
-    '(W)': lambda curr: XY(19, 37),
-    '(X)': lambda curr: XY(31, 37),
     }
+
+teleport_names = iter(['({0})'.format(port_letter) for port_letter in ascii_uppercase])
+teleport_ys = itertools.cycle([ y for y in range(1, 43, 6)])
+
+def get_teleports():
+    while True:
+        for r in ([x for x in range(7, 43, 12)],
+                  [x for x in range(1, 43, 12)]):
+            y = next(teleport_ys)
+            for x in r:
+                name = next(teleport_names, None)
+                if name:
+                    yield(name, x, y)
+                else:
+                    return
+
+def teleport(xy):
+    return lambda _: xy
+
+for name, x, y in get_teleports():
+    moves_map[name] = teleport(XY(x, y))
+
 
 def get_xy_moves(moves):
     # transform into XY movements
