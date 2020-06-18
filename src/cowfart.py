@@ -30,7 +30,7 @@ REALMS_MAX_Y = 38
 PLAN_LINE_WIDTH = 10
 TOTAL_IMPULSES = 10
 
-EMPTY_IMAGE_RGBA = (255, 255, 255)  #  , 0)
+EMPTY_IMAGE_RGBA = (255, 255, 255)
 RGBA = 'RGB'
 HOME_COLOUR = '#666600'
 HOME_X = 31
@@ -39,6 +39,7 @@ HOME_Y = 7
 do_recon = True
 known_units = []
 known_digs = []
+cell_colours = []
 
 from html.parser import HTMLParser
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -181,11 +182,15 @@ def write_table_index(cell_image: Image, table_index: int):
 
 def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, row_data: [], prev_row_data: []) -> Image:
     """Build one row image from the row data"""
+    global cell_colours
     row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), EMPTY_IMAGE_RGBA)
     for cell_index, cell_data in enumerate(row_data):
         cell_content, cell_colour = cell_data
-        cell_image = Image.new(RGBA, (REALM_WIDTH - REALM_BORDER * 2, REALM_HEIGHT - REALM_BORDER * 2),
-                               html_colour_to_rgba(cell_colour))
+        cell_colour = html_colour_to_rgba(cell_colour)
+        cell_colours.append(cell_colour)
+        cell_image = Image.new(RGBA,
+                               (REALM_WIDTH - REALM_BORDER * 2, REALM_HEIGHT - REALM_BORDER * 2),
+                               cell_colour)
         if row_index == 0 and cell_index == 0:
             write_on_cell(cell_image, cell_content, True, zero_cell_label)
         else:
@@ -309,14 +314,6 @@ def get_named_files(name: str, dir_name: str):
 def read_file(turnmap_filename):
     result = open(turnmap_filename).read()
     result = result.replace('<b>', ' ').replace('</b>', ' ').replace('<i>', ' ').replace('</i>', ' ')
-    #.replace('<i>x1</i>', ' ').replace('<i>x2</i>', ' ').replace('<i>x3</i>',
-    #' ').replace('<i>x4</i>', ' ')
-    #.replace('<i>x5</i>', ' ').replace('<i>x6</i>', ' ').replace('<i>x7</i>',
-    #' ').replace('<i>x8</i>', ' ')
-    #.replace('<i>X1</i>', ' ').replace('<i>X2</i>', ' ').replace('<i>X3</i>',
-    #' ').replace('<i>X4</i>', ' ')
-    #.replace('<i>X5</i>', ' ').replace('<i>X6</i>', ' ').replace('<i>X7</i>',
-    #' ').replace('<i>X8</i>', ' ')
     return result
 
 
@@ -337,11 +334,20 @@ def get_maps(map_label: str, is_turn_map: bool, turnmap_filename: str) -> Image:
         yield one_map
 
 
-def get_contrast_colour(hex_color: str, brightness_offset=50):
-    rgb_hex = [hex_color[x:x + 2] for x in [1, 3, 5]]
-    new_rgb_int = [int(hex_value, 16) + brightness_offset for hex_value in rgb_hex]
-    new_rgb_int = [min([255, max([0, i])]) for i in new_rgb_int]  # make sure new values are between 0 and 255
-    return "#" + "".join([hex(i)[2:] for i in new_rgb_int])
+curr_rgb_int = (None, None, None)
+import random
+random.seed()
+
+def get_next_colour():
+    global curr_rgb_int
+    global cell_colours
+    while True:
+        curr_rgb_int = tuple([random.randint(1, 250) for _ in curr_rgb_int])
+        if curr_rgb_int in cell_colours:
+            continue
+        else:
+            break
+    return "#" + "".join(['{0:02x}'.format(i) for i in curr_rgb_int])
 
 
 def get_unit_moves(unit_moves):
@@ -359,9 +365,29 @@ def draw_plan(xy_moves, last_image: Image) -> Image:
     draw_context = ImageDraw.Draw(last_image)
     for unit_name, unit_moves in xy_moves.items():
         draw_context.line(get_unit_moves(unit_moves),
-                          fill=get_contrast_colour(HOME_COLOUR),
+                          fill=get_next_colour(),
                           width=PLAN_LINE_WIDTH)
     return last_image
+
+teleport_names = iter(['({0})'.format(port_letter) for port_letter in ascii_uppercase])
+teleport_xs = [x for x in range(7, 43, 12)]
+teleport_xs.extend([x for x in range(1, 43, 12)])
+#teleport_xs = iter(teleport_ys)
+#teleport_ys = iter([y for y in range(1, 43, 6)])
+teleport_ys = [y for y in range(1, 43, 6)]
+
+#while True:
+#    name = next(teleport_names, None)
+#    if name:
+#        #x = next(teleport_xs, None)
+#        #y = next(teleport_ys, None)
+#        for x in teleport_xs:
+#            for y in teleport_ys:
+#                print(name, x, y)
+#        #else:
+#        #    break
+#    else:
+#        break;
 
 moves_map = { 
     '.': lambda curr: XY(curr.x, curr.y),
@@ -370,10 +396,7 @@ moves_map = {
     'S': lambda curr: XY(curr.x, curr.y+1),
     'W': lambda curr: XY(curr.x-1, curr.y),
     'E': lambda curr: XY(curr.x+1, curr.y),
-#    }
-    
-#for port_letter in ascii_uppercase:
-#    moves_map['({0})'.format(port_letter)] =  lambda curr: XY(7, 1)
+#    }    
 
     '(A)': lambda curr: XY(7, 1),
     '(B)': lambda curr: XY(19, 1),
@@ -450,4 +473,4 @@ def main(orders_dir, orders_filename):
 
     
 if __name__ == '__main__':
-    main(RESULT_DIRECTORY, 'CoW_Orders_Game_g7_Turn_7_NCR.txt')
+    main(RESULT_DIRECTORY, 'CoW_Orders_Game_g7_Turn_8_NCR.txt')
