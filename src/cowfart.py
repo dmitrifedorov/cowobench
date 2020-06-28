@@ -104,12 +104,12 @@ def get_table(data: str, is_turn_map: bool) -> []:
             yield table
 
 
-def html_colour_to_rgba(html_colour: str) -> ():
+def html_colour_to_rgb(html_colour: str) -> ():
     """Convers HTML colout to its RGB values"""
     html_colour = html_colour.strip()
     if html_colour[0] == '#':
         html_colour = html_colour[1:]
-    return tuple([int(x, 16) for x in (html_colour[:2], html_colour[2:4], html_colour[4:], '0')])
+    return tuple([int(x, 16) for x in (html_colour[:2], html_colour[2:4], html_colour[4:])])
 
 
 def write_on_cell(cell_image: Image, cell_content: str,
@@ -187,8 +187,9 @@ def get_one_row_image(table_index: int, zero_cell_label: str, row_index: int, ro
     row_image = Image.new(RGBA, (REALM_WIDTH * REALMS_MAX_X, REALM_HEIGHT), EMPTY_IMAGE_RGBA)
     for cell_index, cell_data in enumerate(row_data):
         cell_content, cell_colour = cell_data
-        cell_colour = html_colour_to_rgba(cell_colour)
-        cell_colours.append(cell_colour)
+        cell_colour = html_colour_to_rgb(cell_colour)
+        if not cell_colour in cell_colours:
+            cell_colours.append(cell_colour)
         cell_image = Image.new(RGBA,
                                (REALM_WIDTH - REALM_BORDER * 2, REALM_HEIGHT - REALM_BORDER * 2),
                                cell_colour)
@@ -339,14 +340,29 @@ curr_rgb_int = (None, None, None)
 import random
 random.seed()
 
+def too_close(curr_rgb_int):
+    global cell_colours
+    MAX_DIFFERENCE = 5
+    if curr_rgb_int in cell_colours:
+        return True
+    rc, gc, bc = curr_rgb_int
+    for re, ge, be in cell_colours:
+        if (abs(re - rc) <= MAX_DIFFERENCE) and \
+            (abs(ge - gc) <= MAX_DIFFERENCE) and \
+            (abs(be - bc) <= MAX_DIFFERENCE):
+            return True
+    return False
+
+
 def get_next_colour():
     global curr_rgb_int
     global cell_colours
     while True:
-        curr_rgb_int = tuple([random.randint(1, 250) for _ in curr_rgb_int])
-        if curr_rgb_int in cell_colours:
+        curr_rgb_int = tuple([random.randint(1, 255) for _ in curr_rgb_int])
+        if too_close(curr_rgb_int):
             continue
         else:
+            cell_colours.append(curr_rgb_int)
             break
     return "#" + "".join(['{0:02x}'.format(i) for i in curr_rgb_int])
 
@@ -445,4 +461,4 @@ def main(orders_dir, orders_filename):
 
     
 if __name__ == '__main__':
-    main(RESULT_DIRECTORY, 'CoW_Orders_Game_g7_Turn_8_NCR.txt')
+    main(RESULT_DIRECTORY, 'CoW_Orders_Game_g7_Turn_9_NCR.txt')
